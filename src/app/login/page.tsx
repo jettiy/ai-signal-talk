@@ -1,0 +1,119 @@
+'use client';
+import Link from 'next/link';
+import { useState } from 'react';
+
+export default function LoginPage() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    // TODO: NextAuth 로그인
+    setTimeout(() => setLoading(false), 1500);
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--bg-primary)' }}>
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+              <path d="M4 26L12 14L20 20L30 6" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M24 6L30 6L30 12" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round"/>
+            </svg>
+            <span className="text-2xl font-black text-white tracking-tight">AI 시그널톡</span>
+          </div>
+          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>실시간 투자 시그널과 트레이더 커뮤니티</p>
+        </div>
+
+        {/* Card */}
+        <div className="rounded-2xl p-8" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)' }}>
+          <h1 className="text-xl font-bold text-white mb-1">로그인</h1>
+          <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>계정 정보를 입력하여 터미널에 접속하세요.</p>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium mb-2 text-white">아이디</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-secondary)' }}>@</span>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  required
+                  className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-2 text-white">비밀번호</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+                </span>
+                <input
+                  type={showPw ? 'text' : 'password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full pl-9 pr-12 py-3 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPw(!showPw)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-sm"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {showPw ? '🙈' : '👁️'}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="remember" className="w-4 h-4 accent-[#00FF41]" />
+              <label htmlFor="remember" className="text-sm" style={{ color: 'var(--text-secondary)' }}>로그인 상태 유지</label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+              style={{ background: 'var(--accent-green)', color: '#000' }}
+            >
+              {loading ? '접속 중...' : '터미널 접속하기'}
+              {!loading && <span>→</span>}
+            </button>
+          </form>
+
+          <div className="flex items-center justify-between mt-4">
+            <Link href="/signup" className="text-sm hover:underline" style={{ color: 'var(--accent-green)' }}>
+              신규 회원가입
+            </Link>
+            <a href="#" className="text-sm hover:underline" style={{ color: 'var(--text-secondary)' }}>
+              아이디/비밀번호 찾기
+            </a>
+          </div>
+        </div>
+
+        {/* Footer Status */}
+        <div className="flex items-center justify-center gap-6 mt-6">
+          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+            🛡️ ENCRYPTED
+          </span>
+          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+            ☁️ SYSTEM STABLE
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
