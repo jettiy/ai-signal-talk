@@ -1,6 +1,8 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
-import { NewsItem } from '@/lib/fmp';
+import { type NewsItem } from '@/lib/types';
+
+export type { NewsItem };
 
 export function useNews() {
   return useQuery<NewsItem[]>({

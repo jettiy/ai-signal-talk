@@ -1,3 +1,4 @@
+// SERVER ONLY — do not import from client components
 // AI Client — MiMo / DeepSeek / GPT-4o 병렬 호출
 
 export interface AiSignalResult {

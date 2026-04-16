@@ -1,47 +1,11 @@
-// FMP API Client
-// https://site.financialmodelingprep.com/developer/docs
+// FMP API Client — SERVER ONLY
+// 이 파일은 API Route(route.ts)에서만 임포트해야 함
+// 클라이언트 번들에 절대 포함되지 않도록 주의
 
-const FMP_API_KEY = process.env.FMP_API_KEY;
+import { Quote, NewsItem, CandleData } from './types';
+
+const FMP_API_KEY = process.env.FMP_API_KEY || '';
 const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
-
-export interface Quote {
-  symbol: string;
-  price: number;
-  changesPercentage: number;
-  change: number;
-  dayLow: number;
-  dayHigh: number;
-  yearHigh: number;
-  yearLow: number;
-  marketCap: number;
-  priceAvg50: number;
-  priceAvg200: number;
-  volume: number;
-  avgVolume: number;
-  exchange: string;
-  open: number;
-  previousClose: number;
-  eps: number;
-  pe: number;
-}
-
-export interface NewsItem {
-  symbol: string;
-  publishedDate: string;
-  title: string;
-  text: string;
-  source: string;
-  image: string;
-  url: string;
-}
-
-// 주요_SYMBOL 목록
-export const TRACKED_SYMBOLS = [
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AMD', 'INTC',
-  'SPY', 'QQQ', 'DIA', 'IWM',
-  'GLD', 'SLV', 'USO',
-  'CL=F', 'NG=F', 'BZ=F', // Crude, Natural Gas, Brent
-];
 
 // 실시간 시세 조회
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
@@ -88,8 +52,8 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
 // 차트 데이터 (Candlestick)
 export async function getHistoricalChart(
   symbol: string,
-  timeframe = '30min' // 1min, 5min, 15min, 30min, 1hour, 4hour, daily
-): Promise<{timestamp: number; open: number; high: number; low: number; close: number; volume: number}[]> {
+  timeframe = '30min'
+): Promise<CandleData[]> {
   if (!FMP_API_KEY) {
     return getMockChartData();
   }
@@ -113,7 +77,7 @@ export async function getHistoricalChart(
 
     if (!res.ok) throw new Error(`FMP Chart error: ${res.status}`);
     const data = await res.json();
-    
+
     return data.slice(-100).map((d: Record<string, number>) => ({
       timestamp: new Date(d.date).getTime(),
       open: d.open,
@@ -172,7 +136,7 @@ export function getMockNews(): NewsItem[] {
       symbol: 'NVDA',
       publishedDate: new Date().toISOString(),
       title: '엔비디아, AI 칩 수요 폭발적 증가로 사상 최대 분기 매출 경신',
-      text: '엔비디아가 4분기에预期的을 뛰어넘는 실적을 기록하며 AI 칩 시장에 강력한 수요가 있음을 입증했다.',
+      text: '엔비디아가 4분기 예상치를 뛰어넘는 실적을 기록하며 AI 칩 시장에 강력한 수요가 있음을 입증했다.',
       source: 'Reuters',
       image: '',
       url: '#',
@@ -180,7 +144,7 @@ export function getMockNews(): NewsItem[] {
     {
       symbol: 'SPY',
       publishedDate: new Date().toISOString(),
-      title: '美 Fed, 금리 동결 유지を発表 — 2026년 인하 기대 여부 논쟁',
+      title: '美 Fed, 금리 동결 유지 발표 — 2026년 인하 기대 여부 논쟁',
       text: '연방준비위원회는 만장일치로 기준금리를 현재 수준으로 유지한다고 밝혔다.',
       source: 'Bloomberg',
       image: '',
@@ -189,7 +153,7 @@ export function getMockNews(): NewsItem[] {
     {
       symbol: 'CL=F',
       publishedDate: new Date().toISOString(),
-      title: '호르만자 해협 긴장 지속 — WTI 원유 93달러 台',
+      title: '호르무즈 해협 긴장 지속 — WTI 원유 93달러 대',
       text: '이란-미국 협상 진행 속에서 원유 공급 불안이 이어지고 있다.',
       source: 'CNBC',
       image: '',
@@ -199,7 +163,7 @@ export function getMockNews(): NewsItem[] {
       symbol: 'TSLA',
       publishedDate: new Date().toISOString(),
       title: '테슬라, 완전자율주행 기대감에 투자자들 급매집중',
-      text: '테슬라의 Robotaxi 서비스 구체化期待が高まっている中、주가가 변동성을 보이고 있다.',
+      text: '테슬라의 Robotaxi 서비스 구체화 기대가 높아지는 가운데, 주가가 변동성을 보이고 있다.',
       source: 'Reuters',
       image: '',
       url: '#',
@@ -216,13 +180,13 @@ export function getMockNews(): NewsItem[] {
   ];
 }
 
-export function getMockChartData() {
+export function getMockChartData(): CandleData[] {
   const now = Date.now();
-  const data = [];
+  const data: CandleData[] = [];
   let price = 180;
 
   for (let i = 0; i < 100; i++) {
-    const t = now - (100 - i) * 5 * 60 * 1000; // 5분봉
+    const t = now - (100 - i) * 5 * 60 * 1000;
     const change = (Math.random() - 0.48) * 2;
     const open = price;
     const close = price + change;
