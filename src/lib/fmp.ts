@@ -2,7 +2,7 @@
 // 이 파일은 API Route(route.ts)에서만 임포트해야 함
 // 클라이언트 번들에 절대 포함되지 않도록 주의
 
-import { Quote, NewsItem, CandleData } from './types';
+import { Quote, NewsItem, CandleData, FearGreedIndex } from './types';
 
 const FMP_API_KEY = process.env.FMP_API_KEY || '';
 const FMP_BASE = 'https://financialmodelingprep.com/stable';
@@ -141,6 +141,37 @@ export async function getHistoricalChart(
   }
 }
 
+// Fear & Greed Index 조회
+export async function getFearGreedIndex(): Promise<FearGreedIndex> {
+  if (!FMP_API_KEY) {
+    console.warn('FMP_API_KEY not set, returning mock Fear & Greed data');
+    return getMockFearGreedIndex();
+  }
+
+  try {
+    const res = await fetch(
+      `${FMP_BASE}/fear-and-greed-index?apikey=${FMP_API_KEY}`,
+      { cache: 'no-store' } as RequestInit
+    );
+    if (!res.ok) throw new Error(`FMP Fear & Greed error: ${res.status}`);
+    const data = await res.json();
+
+    if (!Array.isArray(data) || data.length === 0) {
+      return getMockFearGreedIndex();
+    }
+
+    const raw = data[0];
+    return {
+      value: raw.value ?? 0,
+      valueClassification: raw.valueClassification ?? 'Neutral',
+      timestamp: raw.timestamp ?? new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('FMP getFearGreedIndex error:', error);
+    return getMockFearGreedIndex();
+  }
+}
+
 // ========== Mock Data (API 키 없을 때) ==========
 
 export function getMockQuotes(symbols: string[]): Quote[] {
@@ -253,4 +284,12 @@ export function getMockChartData(): CandleData[] {
     price = close;
   }
   return data;
+}
+
+export function getMockFearGreedIndex(): FearGreedIndex {
+  return {
+    value: 45,
+    valueClassification: 'Fear',
+    timestamp: new Date().toISOString(),
+  };
 }

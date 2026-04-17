@@ -41,6 +41,12 @@ export interface CandleData {
   volume: number;
 }
 
+export interface FearGreedIndex {
+  value: number;          // 0~100
+  valueClassification: string;  // 'Extreme Fear' | 'Fear' | 'Neutral' | 'Greed' | 'Extreme Greed'
+  timestamp: string;
+}
+
 // ===== AI 시그널 결과 (확장 스키마) =====
 export interface AiSignalResult {
   // 기존 필드 (하위 호환)
