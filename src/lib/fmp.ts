@@ -18,7 +18,7 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
     const symbolsParam = symbols.join(',');
     const res = await fetch(
       `${FMP_BASE}/quote/${symbolsParam}?apikey=${FMP_API_KEY}`,
-      { next: { revalidate: 10 } }
+      { cache: 'no-store' } as RequestInit
     );
 
     if (!res.ok) throw new Error(`FMP API error: ${res.status}`);
@@ -40,7 +40,7 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
       ? `${FMP_BASE}/stock_news?ticker=${symbol}&apikey=${FMP_API_KEY}`
       : `${FMP_BASE}/stock_news?limit=50&apikey=${FMP_API_KEY}`;
 
-    const res = await fetch(url, { next: { revalidate: 30 } });
+    const res = await fetch(url, { cache: 'no-store' } as RequestInit);
     if (!res.ok) throw new Error(`FMP News error: ${res.status}`);
     return await res.json();
   } catch (error) {
@@ -72,7 +72,7 @@ export async function getHistoricalChart(
   try {
     const res = await fetch(
       `${FMP_BASE}/historical-chart/${period}/${symbol}?apikey=${FMP_API_KEY}`,
-      { next: { revalidate: 30 } }
+      { cache: 'no-store' } as RequestInit
     );
 
     if (!res.ok) throw new Error(`FMP Chart error: ${res.status}`);
