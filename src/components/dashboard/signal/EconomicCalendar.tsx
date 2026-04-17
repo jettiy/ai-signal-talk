@@ -3,28 +3,37 @@
 import { Calendar, Clock, AlertTriangle } from 'lucide-react';
 
 // ── 오늘 발표 일정 ────────────────────────────────────────────
+// actual > forecast → 초록, actual < forecast → 빨강, 전월치 → 흰색
 const TODAY_EVENTS = [
-  { time: '22:30', event: '실업수당청구', impact: 'high' as const, forecast: '220K', previous: '228K' },
-  { time: '22:30', event: '필라델피아 Fed', impact: 'medium' as const, forecast: '-2.5', previous: '12.5' },
-  { time: '23:00', event: 'ISM 제조업 PMI', impact: 'high' as const, forecast: '49.8', previous: '50.3' },
-  { time: '23:00', event: 'JOLTS 채용공고', impact: 'medium' as const, forecast: '8.80M', previous: '8.76M' },
-  { time: '01:00', event: 'FOMC 의사록', impact: 'high' as const, forecast: '-', previous: '-' },
+  { time: '22:30', event: '실업수당청구', actual: 220, forecast: 228, previous: 215, unit: 'K' },
+  { time: '22:30', event: '필라델피아 Fed', actual: -2.5, forecast: 12.5, previous: 12.5, unit: '' },
+  { time: '23:00', event: 'ISM 제조업 PMI', actual: 49.8, forecast: 50.3, previous: 50.3, unit: '' },
+  { time: '23:00', event: 'JOLTS 채용공고', actual: 8.76, forecast: 8.80, previous: 8.76, unit: 'M' },
+  { time: '01:00', event: 'FOMC 의사록', actual: null, forecast: null, previous: null, unit: '' },
 ];
 
 // ── 이번주 주요 일정 ──────────────────────────────────────────
 const WEEK_EVENTS = [
-  { day: '월', date: '04/14', event: '소매매출', impact: 'high' as const, forecast: '+0.3%', previous: '+0.2%' },
-  { day: '화', date: '04/15', event: '산업생산', impact: 'medium' as const, forecast: '+0.2%', previous: '+0.1%' },
-  { day: '수', date: '04/16', event: '주택착공', impact: 'medium' as const, forecast: '1.38M', previous: '1.36M' },
-  { day: '목', date: '04/17', event: '실업수당청구', impact: 'high' as const, forecast: '220K', previous: '228K' },
-  { day: '금', date: '04/18', event: '비농업고용지표', impact: 'high' as const, forecast: '165K', previous: '151K' },
+  { day: '월', event: '소매매출', actual: null, forecast: 0.3, previous: 0.2, unit: '%', isUp: true },
+  { day: '화', event: '산업생산', actual: 0.2, forecast: 0.1, previous: 0.1, unit: '%', isUp: true },
+  { day: '수', event: '주택착공', actual: 1.36, forecast: 1.38, previous: 1.36, unit: 'M', isUp: false },
+  { day: '목', event: '실업수당청구', actual: null, forecast: 220, previous: 228, unit: 'K', isUp: false },
+  { day: '금', event: '비농업고용지표', actual: null, forecast: 165, previous: 151, unit: 'K', isUp: true },
 ];
 
-const IMPACT_STYLE = {
-  high: { color: '#FF3B3B', bg: 'rgba(255,59,59,0.08)', dot: '#FF3B3B' },
-  medium: { color: '#FFD700', bg: 'rgba(255,215,0,0.08)', dot: '#FFD700' },
-  low: { color: '#555', bg: 'rgba(85,85,85,0.08)', dot: '#555' },
-};
+function formatValue(val: number | null, unit: string) {
+  if (val === null) return '-';
+  const prefix = val > 0 && unit === '%' ? '+' : '';
+  return `${prefix}${val}${unit}`;
+}
+
+// 결과값 색상 판별: actual > forecast → 초록(호조), actual < forecast → 빨강(부진)
+function getActualColor(actual: number | null, forecast: number | null) {
+  if (actual === null || forecast === null) return '#888'; // 미발표
+  if (actual > forecast) return '#00FF41'; // 예상치 상회 → 초록
+  if (actual < forecast) return '#FF3B3B'; // 예상치 하회 → 빨강
+  return '#FFD700'; // 동일 → 노랑
+}
 
 export default function EconomicCalendar() {
   return (
@@ -36,10 +45,10 @@ export default function EconomicCalendar() {
       <div className="flex items-center gap-2 px-4 py-2">
         <Calendar size={11} style={{ color: '#FFD700' }} />
         <span className="text-[10px] font-bold" style={{ color: '#FFD700' }}>주요 경제지표 일정</span>
-        <span className="text-[9px] ml-auto" style={{ color: '#444' }}>미국 | KST 기준</span>
+        <span className="text-[9px] ml-auto" style={{ color: '#444' }}>미국 / KST 기준</span>
       </div>
 
-      {/* 두 섹션: 오늘 발표 / 이번주 */}
+      {/* 두 섹션 */}
       <div className="flex gap-3 px-4 pb-3">
         {/* 오늘 발표 */}
         <div className="flex-1 min-w-0">
@@ -49,19 +58,29 @@ export default function EconomicCalendar() {
           </div>
           <div className="space-y-1">
             {TODAY_EVENTS.map((evt) => {
-              const imp = IMPACT_STYLE[evt.impact];
+              const actualColor = getActualColor(evt.actual, evt.forecast);
               return (
                 <div
                   key={evt.time + evt.event}
-                  className="flex items-center gap-2 rounded-md px-2.5 py-1.5"
+                  className="rounded-md px-2.5 py-1.5"
                   style={{ background: '#111118' }}
                 >
-                  <span className="text-[9px] font-bold font-mono shrink-0" style={{ color: '#555' }}>{evt.time}</span>
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: imp.dot }} />
-                  <span className="text-[10px] font-semibold text-white truncate">{evt.event}</span>
-                  <span className="text-[9px] ml-auto shrink-0 font-mono" style={{ color: '#444' }}>
-                    {evt.forecast !== '-' ? `예상 ${evt.forecast}` : ''}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[9px] font-bold font-mono shrink-0" style={{ color: '#555' }}>{evt.time}</span>
+                    <span className="text-[10px] font-semibold text-white">{evt.event}</span>
+                  </div>
+                  {evt.forecast !== null ? (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <span className="text-[11px] font-bold font-mono" style={{ color: actualColor }}>
+                        {formatValue(evt.actual, evt.unit)}
+                      </span>
+                      <span className="text-[9px]" style={{ color: '#555' }}>
+                        (예상치: <span style={{ color: '#FFD700' }}>{formatValue(evt.forecast, evt.unit)}</span>, 전월치: <span style={{ color: '#FFF' }}>{formatValue(evt.previous, evt.unit)}</span>)
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[9px] mt-0.5" style={{ color: '#444' }}>발표 대기</span>
+                  )}
                 </div>
               );
             })}
@@ -79,24 +98,38 @@ export default function EconomicCalendar() {
           </div>
           <div className="space-y-1">
             {WEEK_EVENTS.map((evt) => {
-              const imp = IMPACT_STYLE[evt.impact];
+              const actualColor = getActualColor(evt.actual, evt.forecast);
               return (
                 <div
                   key={evt.day + evt.event}
-                  className="flex items-center gap-2 rounded-md px-2.5 py-1.5"
+                  className="rounded-md px-2.5 py-1.5"
                   style={{ background: '#111118' }}
                 >
-                  <span
-                    className="text-[9px] font-bold shrink-0 w-7 text-center rounded px-1"
-                    style={{ color: '#555', background: '#0A0A0F' }}
-                  >
-                    {evt.day}
-                  </span>
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: imp.dot }} />
-                  <span className="text-[10px] font-semibold text-white truncate">{evt.event}</span>
-                  <span className="text-[9px] ml-auto shrink-0 font-mono" style={{ color: '#444' }}>
-                    {evt.forecast}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="text-[9px] font-bold shrink-0 w-5 text-center rounded px-1"
+                      style={{ color: '#555', background: '#0A0A0F' }}
+                    >
+                      {evt.day}
+                    </span>
+                    <span className="text-[10px] font-semibold text-white">{evt.event}</span>
+                  </div>
+                  {evt.actual !== null ? (
+                    <div className="flex items-center gap-1 mt-0.5 ml-7">
+                      <span className="text-[11px] font-bold font-mono" style={{ color: actualColor }}>
+                        {formatValue(evt.actual, evt.unit)}
+                      </span>
+                      <span className="text-[9px]" style={{ color: '#555' }}>
+                        (예상치: <span style={{ color: '#FFD700' }}>{formatValue(evt.forecast, evt.unit)}</span>, 전월치: <span style={{ color: '#FFF' }}>{formatValue(evt.previous, evt.unit)}</span>)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 mt-0.5 ml-7">
+                      <span className="text-[9px]" style={{ color: '#444' }}>
+                        예상치: <span style={{ color: '#FFD700' }}>{formatValue(evt.forecast, evt.unit)}</span>, 전월치: <span style={{ color: '#FFF' }}>{formatValue(evt.previous, evt.unit)}</span>
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
