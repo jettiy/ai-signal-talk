@@ -126,3 +126,24 @@ export const TRACKED_SYMBOLS = [
   'GLD', 'SLV', 'USO',
   'GCUSD', 'CLUSD', 'NQUSD',
 ];
+
+// ===== 유저 역할 (RBAC) =====
+export type UserRole = 'BASIC' | 'PENDING' | 'PRO' | 'ADMIN';
+
+// 상담 메시지
+export interface ConsultMessage {
+  role: 'user' | 'admin';
+  text: string;
+  time: string;
+}
+
+// 상담 대기열 아이템 (관리자용)
+export interface ConsultQueueItem {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  appliedAt: string;
+  status: 'waiting' | 'in_progress' | 'done';
+  messages: ConsultMessage[];
+}

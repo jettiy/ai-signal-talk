@@ -1,30 +1,45 @@
 'use client';
 
-import { useState } from 'react';
 import Image from 'next/image';
 import {
   MessageCircle,
   Zap,
   Newspaper,
   Crown,
+  Shield,
   LogOut,
 } from 'lucide-react';
+import type { UserRole } from '@/lib/types';
 
-const NAV_ITEMS = [
-  { id: 'community', label: '커뮤니티', icon: MessageCircle },
-  { id: 'signal', label: 'AI 시그널', icon: Zap },
-  { id: 'news', label: '뉴스룸', icon: Newspaper },
-  { id: 'pro', label: 'PRO 전환', icon: Crown },
-] as const;
-
-export type NavId = (typeof NAV_ITEMS)[number]['id'];
+export type NavId = 'community' | 'signal' | 'news' | 'pro' | 'admin';
 
 interface SidebarProps {
   active: NavId;
   onNavigate: (id: NavId) => void;
+  userRole: UserRole;
 }
 
-export default function Sidebar({ active, onNavigate }: SidebarProps) {
+function getNavItems(role: UserRole) {
+  const base = [
+    { id: 'community' as NavId, label: '커뮤니티', icon: MessageCircle },
+    { id: 'signal' as NavId, label: 'AI 시그널', icon: Zap },
+    { id: 'news' as NavId, label: '뉴스룸', icon: Newspaper },
+  ];
+
+  // role별 4번째 탭 결정
+  if (role === 'ADMIN') {
+    return [...base, { id: 'admin' as NavId, label: '관리자', icon: Shield }];
+  }
+  if (role === 'PRO') {
+    return [...base, { id: 'pro' as NavId, label: 'PRO', icon: Crown }];
+  }
+  // BASIC, PENDING 모두 PRO 전환 탭
+  return [...base, { id: 'pro' as NavId, label: 'PRO 전환', icon: Crown }];
+}
+
+export default function Sidebar({ active, onNavigate, userRole }: SidebarProps) {
+  const navItems = getNavItems(userRole);
+
   return (
     <aside
       className="w-[72px] flex flex-col items-center py-5 gap-1 shrink-0"
@@ -43,39 +58,44 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
       </div>
 
       {/* 네비게이션 */}
-      {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
-        <button
-          key={id}
-          onClick={() => onNavigate(id as NavId)}
-          className="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
-          style={{
-            background:
-              active === id
-                ? id === 'pro'
-                  ? 'rgba(0,255,65,0.12)'
-                  : 'rgba(0,255,65,0.08)'
-                : 'transparent',
-            color: active === id
-              ? '#00FF41'
-              : id === 'pro'
+      {navItems.map(({ id, label, icon: Icon }) => {
+        const isSpecialTab = id === 'pro' || id === 'admin';
+        return (
+          <button
+            key={id}
+            onClick={() => onNavigate(id)}
+            className="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
+            style={{
+              background:
+                active === id
+                  ? id === 'admin'
+                    ? 'rgba(0,255,65,0.15)'
+                    : isSpecialTab
+                      ? 'rgba(0,255,65,0.12)'
+                      : 'rgba(0,255,65,0.08)'
+                  : 'transparent',
+              color: active === id
                 ? '#00FF41'
-                : '#555',
-            border: `1px solid ${
-              active === id
-                ? 'rgba(0,255,65,0.2)'
-                : id === 'pro'
-                  ? 'rgba(0,255,65,0.1)'
-                  : 'transparent'
-            }`,
-          }}
-          title={label}
-        >
-          <Icon className="w-5 h-5" />
-          <span className={`text-[9px] font-bold ${id === 'pro' ? 'tracking-wide' : ''}`}>
-            {label}
-          </span>
-        </button>
-      ))}
+                : isSpecialTab
+                  ? '#00FF41'
+                  : '#555',
+              border: `1px solid ${
+                active === id
+                  ? 'rgba(0,255,65,0.2)'
+                  : isSpecialTab
+                    ? 'rgba(0,255,65,0.1)'
+                    : 'transparent'
+              }`,
+            }}
+            title={label}
+          >
+            <Icon className="w-5 h-5" />
+            <span className={`text-[9px] font-bold ${isSpecialTab ? 'tracking-wide' : ''}`}>
+              {label}
+            </span>
+          </button>
+        );
+      })}
 
       {/* 하단 로그아웃 */}
       <div className="mt-auto">
