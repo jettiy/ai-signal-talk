@@ -22,9 +22,9 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
-  { id: 'NQUSD', label: '나스닥선물', icon: '📈' },
-  { id: 'GCUSD', label: '골드선물', icon: '🥇' },
-  { id: 'CLUSD', label: 'WTI원유', icon: '🛢️' },
+  { id: 'NQUSD', label: '나스닥선물' },
+  { id: 'GCUSD', label: '골드선물' },
+  { id: 'CLUSD', label: 'WTI원유' },
 ] as const;
 
 // ── Mock 데이터: 시간프레임별 AI 시그널 ──────────────────────────
@@ -137,7 +137,7 @@ export default function SignalPanel() {
                 border: `1px solid ${asset === a.id ? 'rgba(0,255,65,0.2)' : 'transparent'}`,
               }}
             >
-              {a.icon} {a.label}
+              {a.label}
             </button>
           ))}
           <span className="ml-auto text-[10px] font-mono" style={{ color: '#444' }}>
@@ -303,7 +303,7 @@ export default function SignalPanel() {
                   className="mt-2 text-[9px] px-2 py-1 rounded"
                   style={{ background: 'rgba(255,215,0,0.05)', color: '#FFD700' }}
                 >
-                  ⚠️ 백엔드 구축 후 LLM 실시간 분석 연동 예정
+                  백엔드 구축 후 LLM 실시간 분석 연동 예정
                 </div>
               </div>
             </div>

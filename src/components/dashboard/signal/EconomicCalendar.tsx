@@ -2,13 +2,16 @@
 
 import { Calendar, Clock } from 'lucide-react';
 
+// 미국 주요 경제지표 일정만
 const MOCK_EVENTS = [
-  { time: '10:00', event: '한국 수출입', impact: 'medium' as const, forecast: '+3.2%', previous: '+1.8%' },
-  { time: '17:30', event: '유럽 CPI', impact: 'high' as const, forecast: '2.4%', previous: '2.6%' },
-  { time: '18:00', event: 'FOMC 의사록', impact: 'high' as const, forecast: '-', previous: '-' },
-  { time: '22:30', event: '미국 실업수당청구', impact: 'medium' as const, forecast: '220K', previous: '228K' },
-  { time: '23:00', event: '미국 PMI', impact: 'high' as const, forecast: '52.1', previous: '51.8' },
-  { time: '23:30', event: 'EIA 원유 재고', impact: 'medium' as const, forecast: '-1.2M', previous: '+0.8M' },
+  { time: '22:30', event: '실업수당청구', impact: 'high' as const, forecast: '220K', previous: '228K' },
+  { time: '22:30', event: '필라델피아 Fed', impact: 'medium' as const, forecast: '-2.5', previous: '12.5' },
+  { time: '23:00', event: 'ISM 제조업 PMI', impact: 'high' as const, forecast: '49.8', previous: '50.3' },
+  { time: '23:00', event: 'JOLTS 채용공고', impact: 'medium' as const, forecast: '8.80M', previous: '8.76M' },
+  { time: '01:00', event: 'FOMC 의사록', impact: 'high' as const, forecast: '-', previous: '-' },
+  { time: '22:30', event: '비농업고용지표', impact: 'high' as const, forecast: '165K', previous: '151K' },
+  { time: '23:00', event: '소비자신뢰지수', impact: 'medium' as const, forecast: '94.0', previous: '93.1' },
+  { time: '23:30', event: 'EIA 원유재고', impact: 'medium' as const, forecast: '-1.2M', previous: '+0.8M' },
 ];
 
 const IMPACT_STYLE = {
@@ -26,7 +29,7 @@ export default function EconomicCalendar() {
       {/* 헤더 */}
       <div className="flex items-center gap-2 px-4 py-2">
         <Calendar size={11} style={{ color: '#FFD700' }} />
-        <span className="text-[10px] font-bold" style={{ color: '#FFD700' }}>주요 경제지표 일정</span>
+        <span className="text-[10px] font-bold" style={{ color: '#FFD700' }}>미국 주요 경제지표</span>
         <span className="text-[9px] ml-auto" style={{ color: '#444' }}>KST 기준</span>
       </div>
 
@@ -37,7 +40,7 @@ export default function EconomicCalendar() {
           return (
             <div
               key={evt.time + evt.event}
-              className="rounded-lg p-2.5 shrink-0 min-w-[160px]"
+              className="rounded-lg p-2.5 shrink-0 min-w-[155px]"
               style={{ background: '#111118', border: `1px solid ${imp.color}20` }}
             >
               <div className="flex items-center gap-1.5 mb-1">

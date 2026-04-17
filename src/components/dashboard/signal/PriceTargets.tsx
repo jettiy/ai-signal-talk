@@ -48,7 +48,7 @@ export default function PriceTargets({ direction, entry, stopLoss, takeProfit, r
             color: isBuy ? '#00FF41' : '#FF3B3B',
           }}
         >
-          {isBuy ? '🟢 매수' : '🔴 매도'}
+          {isBuy ? '매수' : '매도'}
         </span>
       </div>
 
