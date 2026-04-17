@@ -1,7 +1,13 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import CandlestickChart from '@/components/charts/CandlestickChart';
+import dynamic from 'next/dynamic';
+
+// lightweight-charts는 SSR에서 로드 불가 → dynamic import + ssr:false
+const CandlestickChart = dynamic(
+  () => import('@/components/charts/CandlestickChart'),
+  { ssr: false, loading: () => <div className="w-full h-full flex items-center justify-center text-[11px]" style={{ color: '#444' }}>차트 로딩중...</div> }
+);
 import ProbabilityDonut from './signal/ProbabilityDonut';
 import PriceTargets from './signal/PriceTargets';
 import TradeHistory from './signal/TradeHistory';
