@@ -5,6 +5,7 @@
 import { ChatMessage, ToolCall } from './types';
 import { getQuotes } from './fmp';
 import { webSearch } from './zai-web-search';
+import { MODEL_CHAT } from './ai';
 
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
 const ZAI_BASE = 'https://api.z.ai/api/paas/v4';
@@ -160,7 +161,7 @@ export async function chatWithAgent(
         'Accept-Language': 'ko-KR,ko;q=0.9',
       },
       body: JSON.stringify({
-        model: 'glm-5.1',
+        model: MODEL_CHAT,
         messages,
         tools: AGENT_TOOLS,
         tool_choice: 'auto',
@@ -224,7 +225,7 @@ export async function chatWithAgent(
         'Accept-Language': 'ko-KR,ko;q=0.9',
       },
       body: JSON.stringify({
-        model: 'glm-5.1',
+        model: MODEL_CHAT,
         messages,
         tools: AGENT_TOOLS,
         max_tokens: 2048,

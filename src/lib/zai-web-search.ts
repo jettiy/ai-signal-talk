@@ -1,6 +1,6 @@
 // SERVER ONLY — do not import from client components
 // Z.AI Web Search API — 실시간 금융 뉴스 + 시장 정보 검색
-// Coding Plan Max 플랜 내 무료 사용
+// 3티어: 웹검색 요약은 GLM-4.7-FlashX (초고속 + 초저가)
 
 import { WebSearchResult } from './types';
 
@@ -101,7 +101,7 @@ export async function webSearchInChat(
         'Accept-Language': 'ko-KR,ko;q=0.9',
       },
       body: JSON.stringify({
-        model: 'glm-5.1',
+        model: 'glm-4.7-flashx',
         messages: [
           {
             role: 'system',

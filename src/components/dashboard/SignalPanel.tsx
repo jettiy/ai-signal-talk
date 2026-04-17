@@ -300,6 +300,37 @@ export default function SignalPanel() {
           </button>
         </div>
 
+        {/* AI 시그널 분석 생성 버튼 */}
+        {rightTab === 'signal' && (
+          <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid #1A1A1A' }}>
+            <button
+              onClick={generateSignal}
+              disabled={signalMutation.isPending || !currentQuote}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-all"
+              style={{
+                background: signalMutation.isPending
+                  ? '#1A1A1A'
+                  : 'linear-gradient(135deg, #00FF41 0%, #00CC33 100%)',
+                color: signalMutation.isPending ? '#555' : '#000',
+                border: `1px solid ${signalMutation.isPending ? '#333' : 'rgba(0,255,65,0.3)'}`,
+                opacity: !currentQuote ? 0.4 : 1,
+              }}
+            >
+              {signalMutation.isPending ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  분석 중...
+                </>
+              ) : (
+                <>
+                  <Zap size={14} />
+                  AI 시그널 분석 생성하기
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* 탭 콘텐츠 */}
         <div className="flex-1 overflow-y-auto">
           {rightTab === 'signal' ? (

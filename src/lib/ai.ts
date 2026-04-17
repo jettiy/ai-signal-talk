@@ -1,12 +1,16 @@
 // SERVER ONLY — do not import from client components
-// AI Client — Z.AI GLM-5.1 (주력) + MiniMax/DeepSeek/GPT-4o (폴백)
-// 지원 기능: Thinking Mode, Structured Output, Web Search, Context Caching
+// AI Client — 3티어 전략: GLM-5(시그널) + GLM-5-Turbo(채팅) + GLM-4.7-FlashX(요약)
+// + MiniMax/DeepSeek/GPT-4o (폴백 체인)
 
 import { AiSignalResult, WebSearchResult, getPredictionType } from './types';
 
-// ===== Z.AI GLM-5.1 (주력) =====
+// ===== Z.AI (3티어) =====
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
 const ZAI_BASE = 'https://api.z.ai/api/paas/v4';
+
+// 티어별 모델명
+export const MODEL_SIGNAL = 'glm-5';      // AI 시그널 — 깊은 추론, 품질 우선
+export const MODEL_CHAT = 'glm-5-turbo';  // 채팅 에이전트 — Function Calling 최적화, 속도 우선
 
 // 시스템 프롬프트 (Context Caching 대상 — 반복 사용)
 const SIGNAL_SYSTEM_PROMPT = `너는 한국 전문 트레이더 AI 분석가야. 주어진 종목의 실시간 시세, 뉴스, 기술적 지표를 종합 분석해서 매매 시그널을 생성해.
@@ -77,7 +81,7 @@ async function callZaiGLM(
 
   try {
     const body: Record<string, unknown> = {
-      model: 'glm-5.1',
+      model: MODEL_SIGNAL,
       messages: [
         { role: 'system', content: SIGNAL_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
@@ -127,7 +131,7 @@ async function callZaiGLM(
       rationale: parsed.rationale || '',
       timeframe: parsed.timeframe || '단기:1시간~3일',
       signalType: parsed.signalType === 'LONG' ? 'LONG' : 'SHORT',
-      model: 'GLM-5.1',
+      model: 'GLM-5',
       // Z.AI 확장 필드
       buyProbability: Number(parsed.buyProbability) || 50,
       sellProbability: Number(parsed.sellProbability) || 50,
@@ -152,7 +156,7 @@ export async function callZaiGLMStream(
   if (!ZAI_API_KEY) throw new Error('ZAI_API_KEY not set');
 
   const body: Record<string, unknown> = {
-    model: 'glm-5.1',
+    model: MODEL_SIGNAL,
     messages: [
       { role: 'system', content: SIGNAL_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
