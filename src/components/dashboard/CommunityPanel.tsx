@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  MessageCircle, Send, Users, Crown, Hash, TrendingUp, TrendingDown,
-  Newspaper, Clock, Flame, BarChart3, Zap,
+  MessageCircle, Send, Newspaper, Clock, Flame, TrendingUp, TrendingDown,
+  Zap, BarChart3, Hash,
 } from 'lucide-react';
 import {
   createChart,
@@ -19,6 +19,7 @@ const GRADE_STYLES: Record<string, { color: string; bg: string }> = {
   PRO: { color: '#00FF41', bg: 'rgba(0,255,65,0.1)' },
   'TOP 1%': { color: '#FF6B6B', bg: 'rgba(255,107,107,0.1)' },
   'LV.05': { color: '#A855F7', bg: 'rgba(168,85,247,0.1)' },
+  BOT: { color: '#00B4D8', bg: 'rgba(0,180,216,0.1)' },
   NEW: { color: '#666', bg: 'rgba(102,102,102,0.1)' },
 };
 
@@ -34,54 +35,28 @@ const CHANNELS = [
 // ── Mock 메시지 ────────────────────────────────────────────────
 const MOCK_MESSAGES = [
   { id: 1, grade: 'WHALE', nickname: 'WhaleKing', msg: '골드 4810에서 롱 진입. TP 4850, SL 4780', time: '09:12', channel: 'gc' },
-  { id: 2, grade: 'PRO', nickname: 'ScalperPro', msg: 'GOLD $4,800 돌파 확인. 강한 매수세 유지 중', time: '09:14', channel: 'gc' },
-  { id: 3, grade: 'TOP 1%', nickname: 'TopTrader', msg: 'NQ 21,280 지지 확인. 여기서 반등 기대', time: '09:16', channel: 'nq' },
-  { id: 4, grade: 'LV.05', nickname: 'AlgoMaster', msg: 'AI 시그널: NVDA SHORT 전환, 신뢰도 65%', time: '09:18', channel: 'signal' },
+  { id: 2, grade: 'BOT', nickname: 'SIGNAL_BOT', msg: 'GOLD $4,800 돌파 확인. 오버나이즈 모멘텀 강세 전환 감지', time: '09:14', channel: 'gc' },
+  { id: 3, grade: 'PRO', nickname: 'ScalperPro', msg: 'NQ 21,280 지지 확인. 여기서 반등 기대', time: '09:16', channel: 'nq' },
+  { id: 4, grade: 'BOT', nickname: 'AI_ANALYST', msg: 'AI 시그널: NVDA SHORT 전환, 신뢰도 65%. 오버나이즈 매도 압력 감지', time: '09:18', channel: 'signal' },
   { id: 5, grade: 'PRO', nickname: 'ScalperPro', msg: '오늘 골드 약세없음. 계속 롱 관점', time: '09:22', channel: 'gc' },
   { id: 6, grade: 'WHALE', nickname: 'GoldBull', msg: '4시간봉 EMA 지지 깔끔. 4850 도달 가능', time: '09:25', channel: 'gc' },
   { id: 7, grade: 'TOP 1%', nickname: 'SwiftTrade', msg: 'NQ RSI 과매수. 21,350에서 매도 전환?', time: '09:28', channel: 'nq' },
   { id: 8, grade: 'PRO', nickname: 'OilTrader', msg: 'WTI $64.80 롱 진입. OPEC 감산 연장 호재', time: '09:30', channel: 'cl' },
-  { id: 9, grade: 'LV.05', nickname: 'DataMiner', msg: 'GC 5분봉 매수 시그널 감지. 신뢰도 82%', time: '09:32', channel: 'signal' },
+  { id: 9, grade: 'BOT', nickname: 'SIGNAL_BOT', msg: 'GC 5분봉 매수 시그널 감지. 신뢰도 82%. 강한 매수세 유지 중', time: '09:32', channel: 'signal' },
   { id: 10, grade: 'WHALE', nickname: 'WhaleKing', msg: 'NQ 21,250 응봉 확인. 추가 상승 가능', time: '09:35', channel: 'nq' },
+  { id: 11, grade: 'TOP 1%', nickname: 'BearHunter', msg: '15:10 오늘 시장이 열릴 때 조심하세요. 변동성 클 수 있음', time: '09:38', channel: 'general' },
+  { id: 12, grade: 'PRO', nickname: 'ScalperPro', msg: '지난 4월 19일 자산가치를 줄인 것 같습니다. 여기서 강조할 점은 리스크 관리입니다', time: '09:42', channel: 'general' },
 ];
 
 // ── Mock 뉴스 ─────────────────────────────────────────────────
 const MOCK_NEWS = [
-  {
-    id: 1, title: '연준, 금리 동결 결정... "추가 인하 여지 열어두겠다"',
-    source: 'Reuters', time: '12분 전', impact: 'high' as const,
-    symbol: 'NQUSD',
-  },
-  {
-    id: 2, title: '골드, $4,800 돌파... 중앙은행 매수세 + 지정학 리스크',
-    source: 'Bloomberg', time: '28분 전', impact: 'high' as const,
-    symbol: 'GCUSD',
-  },
-  {
-    id: 3, title: '엔비디아, AI 칩 수요 견조... 분기 매출 30% 증가 전망',
-    source: 'CNBC', time: '1시간 전', impact: 'medium' as const,
-    symbol: 'NQUSD',
-  },
-  {
-    id: 4, title: 'WTI 원유, OPEC+ 감산 연장 소식에 $65 회복',
-    source: 'Energy Voice', time: '2시간 전', impact: 'medium' as const,
-    symbol: 'CLUSD',
-  },
-  {
-    id: 5, title: '비트코인, 기관 투자자 유입 본격화... ETF 사상 최대',
-    source: 'CoinDesk', time: '3시간 전', impact: 'high' as const,
-    symbol: 'BTCUSD',
-  },
-  {
-    id: 6, title: '애플, AI 기능 탑재 아이폰 17 공급망 물량 20% 증량',
-    source: 'Nikkei Asia', time: '4시간 전', impact: 'low' as const,
-    symbol: 'AAPL',
-  },
-  {
-    id: 7, title: '유럽 CPI 예상치 하회... ECB 추가 인하 가능성',
-    source: 'FT', time: '5시간 전', impact: 'medium' as const,
-    symbol: 'NQUSD',
-  },
+  { id: 1, title: '연준, 금리 동결 결정... "추가 인하 여지 열어두겠다"', source: 'Reuters', time: '12분 전', impact: 'high' as const, symbol: 'NQUSD' },
+  { id: 2, title: '골드, $4,800 돌파... 중앙은행 매수세 + 지정학 리스크', source: 'Bloomberg', time: '28분 전', impact: 'high' as const, symbol: 'GCUSD' },
+  { id: 3, title: '엔비디아, AI 칩 수요 견조... 분기 매출 30% 증가 전망', source: 'CNBC', time: '1시간 전', impact: 'medium' as const, symbol: 'NQUSD' },
+  { id: 4, title: 'WTI 원유, OPEC+ 감산 연장 소식에 $65 회복', source: 'Energy Voice', time: '2시간 전', impact: 'medium' as const, symbol: 'CLUSD' },
+  { id: 5, title: '비트코인, 기관 투자자 유입 본격화... ETF 사상 최대', source: 'CoinDesk', time: '3시간 전', impact: 'high' as const, symbol: 'BTCUSD' },
+  { id: 6, title: '애플, AI 기능 탑재 아이폰 17 공급망 물량 20% 증량', source: 'Nikkei Asia', time: '4시간 전', impact: 'low' as const, symbol: 'AAPL' },
+  { id: 7, title: '유럽 CPI 예상치 하회... ECB 추가 인하 가능성', source: 'FT', time: '5시간 전', impact: 'medium' as const, symbol: 'NQUSD' },
 ];
 
 const IMPACT_MAP = {
@@ -92,12 +67,20 @@ const IMPACT_MAP = {
 
 // ── 미니차트 종목 ──────────────────────────────────────────────
 const MINI_CHART_ASSETS = [
-  { id: 'NQUSD', label: '나스닥선물', price: '21,285', change: '+0.42', dir: 'buy' as const },
-  { id: 'GCUSD', label: '골드선물', price: '4,821', change: '+1.18', dir: 'buy' as const },
+  { id: 'NQUSD', label: '나스닥선물', price: '21,285.50', change: '+0.42', dir: 'buy' as const },
+  { id: 'GCUSD', label: '골드선물', price: '4,821.30', change: '+1.18', dir: 'buy' as const },
   { id: 'CLUSD', label: 'WTI원유', price: '64.80', change: '-0.35', dir: 'sell' as const },
 ];
 
-// ── 미니차트 Mock 데이터 (30개 캔들) ───────────────────────────
+// ── 시간프레임 ──────────────────────────────────────────────
+const TIMEFRAMES = [
+  { id: '1min', label: '1M' },
+  { id: '30min', label: '30M' },
+  { id: '1hour', label: '1H' },
+  { id: '1day', label: '1D' },
+];
+
+// ── 미니차트 Mock 데이터 ────────────────────────────────────
 function generateMiniCandleData(basePrice: number, volatility: number): CandlestickData[] {
   const data: CandlestickData[] = [];
   let price = basePrice;
@@ -127,12 +110,59 @@ const MINI_CHART_DATA: Record<string, CandlestickData[]> = {
   CLUSD: generateMiniCandleData(64.8, 0.3),
 };
 
-// ── 등급 이니셜 ────────────────────────────────────────────────
+// ── 등급 이니셜 ────────────────────────────────────────────
 function getInitials(nickname: string) {
   return nickname.slice(0, 2).toUpperCase();
 }
 
-// ── 미니 캔들차트 컴포넌트 ─────────────────────────────────────
+// ── 원형 신뢰도 게이지 ────────────────────────────────────
+function ConfidenceGauge({ value, size = 80 }: { value: number; size?: number }) {
+  const strokeWidth = 6;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (value / 100) * circumference;
+  const isHigh = value >= 70;
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        {/* 배경 원 */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#1A1A1A"
+          strokeWidth={strokeWidth}
+        />
+        {/* 프로그레스 원 */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={isHigh ? '#00FF41' : '#FFD700'}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference - progress}
+          style={{
+            filter: isHigh ? 'drop-shadow(0 0 6px rgba(0,255,65,0.4))' : 'drop-shadow(0 0 6px rgba(255,215,0,0.4))',
+          }}
+        />
+      </svg>
+      {/* 중앙 텍스트 */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-black font-mono" style={{ color: isHigh ? '#00FF41' : '#FFD700' }}>
+          {value}%
+        </span>
+        <span className="text-[7px] font-bold" style={{ color: '#555' }}>CONF</span>
+      </div>
+    </div>
+  );
+}
+
+// ── 미니 캔들차트 ────────────────────────────────────────
 function MiniCandleChart({ symbol }: { symbol: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -156,8 +186,8 @@ function MiniCandleChart({ symbol }: { symbol: string }) {
         fontSize: 9,
       },
       grid: {
-        vertLines: { color: 'rgba(45,45,45,0.2)' },
-        horzLines: { color: 'rgba(45,45,45,0.2)' },
+        vertLines: { color: 'rgba(45,45,45,0.15)' },
+        horzLines: { color: 'rgba(45,45,45,0.15)' },
       },
       crosshair: {
         mode: 0,
@@ -211,16 +241,15 @@ function MiniCandleChart({ symbol }: { symbol: string }) {
     return () => cleanup?.();
   }, [initChart]);
 
-  return (
-    <div ref={containerRef} className="w-full h-full" />
-  );
+  return <div ref={containerRef} className="w-full h-full" />;
 }
 
-// ── 메인 컴포넌트 ──────────────────────────────────────────────
+// ── 메인 컴포넌트 ────────────────────────────────────────
 export default function CommunityPanel() {
   const [input, setInput] = useState('');
   const [activeChannel, setActiveChannel] = useState('general');
   const [activeMiniAsset, setActiveMiniAsset] = useState('NQUSD');
+  const [activeTimeframe, setActiveTimeframe] = useState('1min');
 
   const filteredMessages = activeChannel === 'general'
     ? MOCK_MESSAGES
@@ -230,9 +259,9 @@ export default function CommunityPanel() {
 
   return (
     <div className="flex h-full">
-      {/* ── 왼쪽: 실시간 뉴스 ─────────────────────────── */}
+      {/* ── 왼쪽: 실시간 뉴스 (20%) ──────────────────────── */}
       <div
-        className="w-[280px] shrink-0 flex flex-col"
+        className="w-[20%] min-w-[220px] shrink-0 flex flex-col"
         style={{ background: '#0A0A0F', borderRight: '1px solid #1A1A1A' }}
       >
         {/* 헤더 */}
@@ -241,7 +270,7 @@ export default function CommunityPanel() {
             <Newspaper size={13} style={{ color: '#00FF41' }} />
             <span className="text-[11px] font-bold text-white">실시간 뉴스</span>
             <span
-              className="flex items-center gap-1 text-[9px] ml-auto px-1.5 py-0.5 rounded-full"
+              className="flex items-center gap-1 text-[8px] ml-auto px-1.5 py-0.5 rounded-full"
               style={{ background: 'rgba(0,255,65,0.08)', color: '#00FF41' }}
             >
               <span className="w-1 h-1 rounded-full pulse-live" style={{ background: '#00FF41' }} />
@@ -251,7 +280,7 @@ export default function CommunityPanel() {
         </div>
 
         {/* 뉴스 리스트 */}
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className="flex-1 overflow-y-auto py-1">
           {MOCK_NEWS.map((news) => {
             const impactInfo = IMPACT_MAP[news.impact];
             return (
@@ -296,7 +325,7 @@ export default function CommunityPanel() {
         </div>
       </div>
 
-      {/* ── 중앙: 실시간 채팅 ─────────────────────────── */}
+      {/* ── 중앙: 실시간 채팅 (60%) ──────────────────────── */}
       <div className="flex flex-col flex-1 min-w-0" style={{ background: '#0D0D0D' }}>
         {/* 채널 탭 + 헤더 */}
         <div
@@ -304,7 +333,7 @@ export default function CommunityPanel() {
           style={{ borderBottom: '1px solid #1A1A1A', background: '#0A0A0F' }}
         >
           <MessageCircle size={13} style={{ color: '#00FF41' }} />
-          <span className="text-[11px] font-bold text-white mr-3">실시간 채팅</span>
+          <span className="text-[11px] font-bold text-white mr-2">실시간 채팅</span>
 
           {/* 채널 탭 */}
           {CHANNELS.map((ch) => (
@@ -333,34 +362,48 @@ export default function CommunityPanel() {
         </div>
 
         {/* 채팅 메시지 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
           {filteredMessages.map((msg) => {
             const style = GRADE_STYLES[msg.grade] || GRADE_STYLES.NEW;
+            const isBot = msg.grade === 'BOT';
             return (
-              <div key={msg.id} className="flex gap-2.5">
+              <div key={msg.id} className="flex gap-3">
                 {/* 아바타 */}
                 <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0"
-                  style={{ background: style.bg, color: style.color }}
+                  className="w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-black shrink-0"
+                  style={{
+                    background: isBot ? 'rgba(0,180,216,0.12)' : style.bg,
+                    color: isBot ? '#00B4D8' : style.color,
+                    border: isBot ? '1px solid rgba(0,180,216,0.25)' : 'none',
+                  }}
                 >
-                  {getInitials(msg.nickname)}
+                  {isBot ? <Zap size={14} /> : getInitials(msg.nickname)}
                 </div>
 
                 {/* 메시지 */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <span
-                      className="text-[9px] font-bold px-1 py-0.5 rounded"
+                      className="text-[9px] font-bold px-1.5 py-0.5 rounded"
                       style={{ background: style.bg, color: style.color }}
                     >
                       {msg.grade}
                     </span>
-                    <span className="text-[11px] font-semibold text-white">{msg.nickname}</span>
+                    <span className="text-[11px] font-semibold" style={{ color: isBot ? '#00B4D8' : '#FFF' }}>
+                      {msg.nickname}
+                    </span>
                     <span className="text-[9px] ml-auto" style={{ color: '#333' }}>{msg.time}</span>
                   </div>
-                  <p className="text-[12px] leading-relaxed" style={{ color: '#BBB' }}>
+                  <div
+                    className="text-[12px] leading-relaxed rounded-lg px-3 py-2 inline-block max-w-full"
+                    style={{
+                      color: '#CCC',
+                      background: isBot ? 'rgba(0,180,216,0.04)' : 'rgba(255,255,255,0.02)',
+                      borderLeft: isBot ? '2px solid rgba(0,180,216,0.3)' : '2px solid transparent',
+                    }}
+                  >
                     {msg.msg}
-                  </p>
+                  </div>
                 </div>
               </div>
             );
@@ -379,7 +422,7 @@ export default function CommunityPanel() {
               style={{ background: '#111118', border: '1px solid #1A1A1A', color: 'white' }}
             />
             <button
-              className="px-4 py-2.5 rounded-xl font-bold text-[12px] cursor-pointer flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl font-bold text-[12px] cursor-pointer flex items-center gap-1.5 transition-all"
               style={{ background: '#00FF41', color: '#000' }}
             >
               <Send size={12} />
@@ -389,32 +432,47 @@ export default function CommunityPanel() {
         </div>
       </div>
 
-      {/* ── 오른쪽: AI 시그널 미니차트 ──────────────────── */}
+      {/* ── 오른쪽: AI 시그널 미니차트 (20%) ─────────────── */}
       <div
-        className="w-[300px] shrink-0 flex flex-col"
+        className="w-[20%] min-w-[260px] shrink-0 flex flex-col"
         style={{ background: '#0A0A0F', borderLeft: '1px solid #1A1A1A' }}
       >
-        {/* 헤더 */}
+        {/* 헤더 — 현재가 + 변동률 */}
         <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid #1A1A1A' }}>
-          <div className="flex items-center gap-2 mb-2.5">
+          <div className="flex items-center gap-2 mb-2">
             <Zap size={13} style={{ color: '#00FF41' }} />
             <span className="text-[11px] font-bold text-white">AI 시그널</span>
             <span
-              className="flex items-center gap-1 text-[9px] ml-auto px-1.5 py-0.5 rounded-full"
+              className="flex items-center gap-1 text-[8px] ml-auto px-1.5 py-0.5 rounded-full"
               style={{ background: 'rgba(0,255,65,0.08)', color: '#00FF41' }}
             >
               <span className="w-1 h-1 rounded-full pulse-live" style={{ background: '#00FF41' }} />
-              실시간
+              LIVE
             </span>
           </div>
 
+          {/* 현재가 */}
+          <div className="flex items-baseline gap-2">
+            <span className="text-xl font-black font-mono text-white">{currentAsset.price}</span>
+            <span
+              className="text-[11px] font-bold flex items-center gap-0.5"
+              style={{ color: currentAsset.dir === 'buy' ? '#00FF41' : '#FF3B3B' }}
+            >
+              {currentAsset.dir === 'buy' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+              {currentAsset.change}%
+            </span>
+          </div>
+        </div>
+
+        {/* 종목 탭 + 시간프레임 */}
+        <div className="px-4 py-2.5 shrink-0 flex flex-col gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
           {/* 종목 탭 */}
           <div className="flex gap-1">
             {MINI_CHART_ASSETS.map((asset) => (
               <button
                 key={asset.id}
                 onClick={() => setActiveMiniAsset(asset.id)}
-                className="flex-1 text-[9px] font-bold px-2 py-1.5 rounded-lg cursor-pointer transition-all"
+                className="flex-1 text-[8px] font-bold px-1.5 py-1.5 rounded-lg cursor-pointer transition-all"
                 style={{
                   background: activeMiniAsset === asset.id ? 'rgba(0,255,65,0.1)' : '#111118',
                   color: activeMiniAsset === asset.id ? '#00FF41' : '#555',
@@ -425,83 +483,98 @@ export default function CommunityPanel() {
               </button>
             ))}
           </div>
+          {/* 시간프레임 */}
+          <div className="flex gap-1">
+            {TIMEFRAMES.map((tf) => (
+              <button
+                key={tf.id}
+                onClick={() => setActiveTimeframe(tf.id)}
+                className="flex-1 text-[8px] font-bold px-1 py-1 rounded cursor-pointer transition-all"
+                style={{
+                  background: activeTimeframe === tf.id ? 'rgba(0,255,65,0.08)' : 'transparent',
+                  color: activeTimeframe === tf.id ? '#00FF41' : '#444',
+                  border: activeTimeframe === tf.id ? '1px solid rgba(0,255,65,0.15)' : '1px solid transparent',
+                }}
+              >
+                {tf.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* 현재가 + 방향 */}
+        {/* 미니 캔들차트 */}
+        <div className="shrink-0 px-2" style={{ height: 160 }}>
+          <MiniCandleChart symbol={activeMiniAsset} />
+        </div>
+
+        {/* 신뢰도 게이지 + 진입가/목표가 */}
         <div
           className="px-4 py-3 shrink-0"
           style={{ borderBottom: '1px solid #1A1A1A' }}
         >
-          <div className="flex items-baseline gap-2">
-            <span className="text-lg font-black font-mono text-white">
-              {currentAsset.price}
-            </span>
-            <span
-              className="text-[11px] font-bold flex items-center gap-0.5"
-              style={{
-                color: currentAsset.dir === 'buy' ? '#00FF41' : '#FF3B3B',
-              }}
-            >
-              {currentAsset.dir === 'buy' ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-              {currentAsset.change}%
-            </span>
+          <div className="flex items-center gap-4">
+            {/* 원형 신뢰도 게이지 */}
+            <ConfidenceGauge value={76} size={80} />
+
+            {/* 진입가 / 목표가 */}
+            <div className="flex-1 space-y-2">
+              <div>
+                <span className="text-[8px] font-bold block" style={{ color: '#555' }}>ENTRY PRICE</span>
+                <span className="text-sm font-black font-mono text-white">
+                  {activeMiniAsset === 'NQUSD' ? '21,210.50' : activeMiniAsset === 'GCUSD' ? '4,810.20' : '64.50'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[8px] font-bold block" style={{ color: '#555' }}>TARGET</span>
+                <span className="text-sm font-black font-mono" style={{ color: '#00FF41' }}>
+                  {activeMiniAsset === 'NQUSD' ? '21,450.00' : activeMiniAsset === 'GCUSD' ? '4,880.00' : '66.20'}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 mt-1">
+
+          {/* 방향 뱃지 */}
+          <div className="flex items-center gap-2 mt-2.5">
             <span
-              className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+              className="text-[9px] font-bold px-2 py-1 rounded"
               style={{
                 background: currentAsset.dir === 'buy' ? 'rgba(0,255,65,0.1)' : 'rgba(255,59,59,0.1)',
                 color: currentAsset.dir === 'buy' ? '#00FF41' : '#FF3B3B',
               }}
             >
-              {currentAsset.dir === 'buy' ? '매수' : '매도'}
+              {currentAsset.dir === 'buy' ? '매수' : '매도'} 시그널
             </span>
             <span className="text-[9px]" style={{ color: '#444' }}>5분봉 기준</span>
           </div>
         </div>
 
-        {/* 미니 캔들차트 */}
-        <div className="flex-1 min-h-0 px-2 py-2">
-          <MiniCandleChart symbol={activeMiniAsset} />
+        {/* AI 분석 요약 */}
+        <div className="flex-1 px-4 py-3 overflow-y-auto min-h-0">
+          <span className="text-[9px] font-bold block mb-1.5" style={{ color: '#555' }}>시장 분석 요약</span>
+          <p className="text-[10px] leading-relaxed" style={{ color: '#888' }}>
+            {activeMiniAsset === 'NQUSD'
+              ? '나스닥 선물 상승 모멘텀 유지. 21,280 지지 확인 후 반등 패턴 진행 중. RSI 58로 중립권 진입, 추가 상승 시 21,450 도달 가능.'
+              : activeMiniAsset === 'GCUSD'
+              ? '골드 강세 지속. 중앙은행 매수세 + 지정학 리스크로 사상 최고치 경신 중. 4,800 돌파 후 4,880 목표가 가능.'
+              : 'WTI 단기 조정 후 $65 회복. OPEC+ 감산 연장 호재, 단기 매수 관점. $66.20 도달 시 부분 익절 권장.'}
+          </p>
         </div>
 
-        {/* 하단: HOT 시그널 요약 */}
-        <div
-          className="shrink-0 px-4 py-3"
-          style={{ borderTop: '1px solid #1A1A1A' }}
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <Crown size={11} style={{ color: '#FFD700' }} />
-            <span className="text-[10px] font-bold text-white">HOT 시그널</span>
-          </div>
-          {[
-            { user: 'WhaleKing', symbol: 'GCUSD', direction: 'buy' as const, confidence: 92 },
-            { user: 'ScalperPro', symbol: 'NQUSD', direction: 'buy' as const, confidence: 85 },
-            { user: 'TopTrader', symbol: 'NQUSD', direction: 'sell' as const, confidence: 78 },
-          ].map((s, i) => {
-            const isBuy = s.direction === 'buy';
-            return (
-              <div
-                key={i}
-                className="flex items-center gap-2 py-1.5"
-                style={{ borderBottom: i < 2 ? '1px solid rgba(26,26,26,0.5)' : 'none' }}
-              >
-                <span className="text-[9px] font-bold" style={{ color: '#666' }}>{s.user}</span>
-                <span
-                  className="text-[8px] font-bold px-1 py-0.5 rounded flex items-center gap-0.5"
-                  style={{
-                    background: isBuy ? 'rgba(0,255,65,0.08)' : 'rgba(255,59,59,0.08)',
-                    color: isBuy ? '#00FF41' : '#FF3B3B',
-                  }}
-                >
-                  {isBuy ? <TrendingUp size={7} /> : <TrendingDown size={7} />}
-                  {isBuy ? '매수' : '매도'}
-                </span>
-                <span className="text-[9px] font-bold font-mono" style={{ color: '#555' }}>{s.symbol}</span>
-                <span className="text-[9px] font-mono ml-auto" style={{ color: '#444' }}>{s.confidence}%</span>
-              </div>
-            );
-          })}
+        {/* AI 시그널 분석 생성 버튼 */}
+        <div className="shrink-0 px-4 py-3" style={{ borderTop: '1px solid #1A1A1A' }}>
+          <button
+            className="w-full py-2.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+            style={{
+              background: '#00FF41',
+              color: '#000',
+            }}
+          >
+            <Zap size={12} />
+            AI시그널 분석 생성하기
+          </button>
+          <p className="text-[8px] text-center mt-1.5" style={{ color: '#333' }}>
+            Quant Model V2.4.8 &copy; 2026 AI Signal Talk
+          </p>
         </div>
       </div>
     </div>
