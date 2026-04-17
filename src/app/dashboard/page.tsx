@@ -32,15 +32,15 @@ const MOCK_CHAT = [
 ];
 
 const MOCK_SIGNALS: Record<string, { type: 'LONG' | 'SHORT'; entry: number; target: number; stop: number; confidence: number; rationale: string }> = {
-  NQ: { type: 'LONG', entry: 18420.5, target: 18580.0, stop: 18340.0, confidence: 78, rationale: '4시간봉 상승 모멘텀 유지, 20 EMA 지지 확인. 미 고용지표 호조로 투자 심리 개선 중.' },
-  GC: { type: 'SHORT', entry: 2034.2, target: 2018.0, stop: 2044.0, confidence: 65, rationale: '2030 저항 돌파 실패, RSI 과매수 구간 진입. 기관 매도 포지션 증가 추세.' },
-  CL: { type: 'LONG', entry: 77.84, target: 79.50, stop: 76.80, confidence: 72, rationale: '원유 재고 감소 + 중동 리스크 프리미엄. 77달러 지지 확인.' },
+  GC: { type: 'LONG', entry: 4810.0, target: 4850.0, stop: 4780.0, confidence: 78, rationale: '4시간봉 상승 모멘텀 유지, $4,800 심리저항 돌파. 글로벌 불확실성 손실回避 수요 지속.' },
+  AAPL: { type: 'LONG', entry: 262.0, target: 270.0, stop: 258.0, confidence: 72, rationale: '20 EMA 지지 확인, AI 기기 수요 증가. 차트 패턴 상승 삼각형 완성.' },
+  NVDA: { type: 'SHORT', entry: 199.0, target: 192.0, stop: 203.0, confidence: 65, rationale: 'RSI 과매수 구간 진입, $200 심리저항 돌파 실패. 기관 매도 포지션 증가.' },
 };
 
 const TICKER_DATA: Record<string, { price: string; change: string; positive: boolean }> = {
-  NQ: { price: '18,542.5', change: '+0.42%', positive: true },
-  GC: { price: '2,034.2', change: '-0.18%', positive: false },
-  CL: { price: '77.84', change: '+0.31%', positive: true },
+  GC: { price: '4,814.7', change: '+0.13%', positive: true },
+  AAPL: { price: '263.4', change: '+1.23%', positive: true },
+  NVDA: { price: '198.35', change: '+3.45%', positive: true },
 };
 
 // 목업 차트 데이터 생성
@@ -80,14 +80,14 @@ const IMPACT_COLORS = {
 // ===== Main Dashboard =====
 
 export default function DashboardPage() {
-  const [activeTab, setActiveTab] = useState<FuturesTab>('NQ');
+  const [activeTab, setActiveTab] = useState<FuturesTab>('GC');
   const [activeTimeframe, setActiveTimeframe] = useState<string>('5min');
   const ticker = TICKER_DATA[activeTab];
   const signal = MOCK_SIGNALS[activeTab];
 
   const chartData = useMemo(() => {
-    const basePrice = activeTab === 'NQ' ? 18500 : activeTab === 'GC' ? 2034 : 77.8;
-    const volatility = activeTab === 'NQ' ? 8 : activeTab === 'GC' ? 3 : 0.5;
+    const basePrice = activeTab === 'GC' ? 4814 : activeTab === 'AAPL' ? 263 : 198;
+    const volatility = activeTab === 'GC' ? 4 : activeTab === 'AAPL' ? 1.5 : 3;
     return generateMockCandleData(basePrice, volatility);
   }, [activeTab]);
 

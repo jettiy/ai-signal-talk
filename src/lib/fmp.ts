@@ -5,9 +5,16 @@
 import { Quote, NewsItem, CandleData } from './types';
 
 const FMP_API_KEY = process.env.FMP_API_KEY || '';
-const FMP_BASE = 'https://financialmodelingprep.com/api/v3';
+const FMP_BASE = 'https://financialmodelingprep.com/stable';
 
-// 실시간 시세 조회
+// 구독 가능한 심볼 목록 (골드선물 + 주요 주식/ETF)
+const AVAILABLE_SYMBOLS = [
+  'GCUSD',   // 골드선물
+  'AAPL', 'NVDA', 'TSLA', 'META', 'MSFT', 'AMZN',
+  'SPY', 'QQQ',
+];
+
+// 실시간 시세 조회 (개별 심볼 병렬 호출)
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   if (!FMP_API_KEY) {
     console.warn('FMP_API_KEY not set, returning mock data');
@@ -15,14 +22,42 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   }
 
   try {
-    const symbolsParam = symbols.join(',');
-    const res = await fetch(
-      `${FMP_BASE}/quote/${symbolsParam}?apikey=${FMP_API_KEY}`,
-      { cache: 'no-store' } as RequestInit
+    const validSymbols = symbols.filter(s => AVAILABLE_SYMBOLS.includes(s));
+    const results = await Promise.all(
+      validSymbols.map(async (symbol) => {
+        const res = await fetch(
+          `${FMP_BASE}/quote?symbol=${symbol}&apikey=${FMP_API_KEY}`,
+          { cache: 'no-store' } as RequestInit
+        );
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!data || data.length === 0) return null;
+        const raw = data[0];
+        // stable API 응답 → Quote 타입 매핑
+        return {
+          symbol: raw.symbol,
+          price: raw.price ?? 0,
+          changesPercentage: raw.changePercentage ?? 0,
+          change: raw.change ?? 0,
+          dayLow: raw.dayLow ?? 0,
+          dayHigh: raw.dayHigh ?? 0,
+          yearHigh: raw.yearHigh ?? 0,
+          yearLow: raw.yearLow ?? 0,
+          marketCap: raw.marketCap ?? 0,
+          priceAvg50: raw.priceAvg50 ?? 0,
+          priceAvg200: raw.priceAvg200 ?? 0,
+          volume: raw.volume ?? 0,
+          avgVolume: raw.avgVolume ?? 0,
+          exchange: raw.exchange ?? '',
+          open: raw.open ?? 0,
+          previousClose: raw.previousClose ?? 0,
+          eps: raw.eps ?? 0,
+          pe: raw.pe ?? 0,
+        } as Quote;
+      })
     );
-
-    if (!res.ok) throw new Error(`FMP API error: ${res.status}`);
-    return await res.json();
+    // null 제거
+    return results.filter((r): r is Quote => r !== null);
   } catch (error) {
     console.error('FMP getQuotes error:', error);
     return getMockQuotes(symbols);
@@ -37,12 +72,24 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
 
   try {
     const url = symbol
-      ? `${FMP_BASE}/stock_news?ticker=${symbol}&apikey=${FMP_API_KEY}`
-      : `${FMP_BASE}/stock_news?limit=50&apikey=${FMP_API_KEY}`;
+      ? `${FMP_BASE}/news?symbol=${symbol}&limit=20&apikey=${FMP_API_KEY}`
+      : `${FMP_BASE}/news?limit=20&apikey=${FMP_API_KEY}`;
 
     const res = await fetch(url, { cache: 'no-store' } as RequestInit);
     if (!res.ok) throw new Error(`FMP News error: ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+
+    if (!Array.isArray(data)) return getMockNews();
+
+    return data.slice(0, 10).map((item: Record<string, string>) => ({
+      symbol: item.symbol || '',
+      publishedDate: item.publishedDate || new Date().toISOString(),
+      title: item.title || '',
+      text: item.text || item.description || '',
+      source: item.source || item.site || '',
+      image: item.image || '',
+      url: item.url || '#',
+    }));
   } catch (error) {
     console.error('FMP getNews error:', error);
     return getMockNews();
@@ -64,27 +111,29 @@ export async function getHistoricalChart(
     '15M': '30min',
     '30M': '1hour',
     '1H': '4hour',
-    '1D': 'daily',
+    '1D': '1day',
   };
 
   const period = periodMap[timeframe] || '30min';
 
   try {
     const res = await fetch(
-      `${FMP_BASE}/historical-chart/${period}/${symbol}?apikey=${FMP_API_KEY}`,
+      `${FMP_BASE}/historical-chart/${period}?symbol=${symbol}&apikey=${FMP_API_KEY}`,
       { cache: 'no-store' } as RequestInit
     );
 
     if (!res.ok) throw new Error(`FMP Chart error: ${res.status}`);
     const data = await res.json();
 
-    return data.slice(-100).map((d: Record<string, number>) => ({
-      timestamp: new Date(d.date).getTime(),
-      open: d.open,
-      high: d.high,
-      low: d.low,
-      close: d.close,
-      volume: d.volume,
+    if (!Array.isArray(data)) return getMockChartData();
+
+    return data.slice(-100).map((d: Record<string, string | number>) => ({
+      timestamp: new Date(d.date as string).getTime(),
+      open: Number(d.open),
+      high: Number(d.high),
+      low: Number(d.low),
+      close: Number(d.close),
+      volume: Number(d.volume),
     }));
   } catch (error) {
     console.error('FMP getHistoricalChart error:', error);
@@ -96,14 +145,15 @@ export async function getHistoricalChart(
 
 export function getMockQuotes(symbols: string[]): Quote[] {
   const base: Record<string, Omit<Quote, 'symbol'>> = {
-    'AAPL': { price: 189.45, changesPercentage: 1.23, change: 2.30, dayLow: 187.00, dayHigh: 190.10, yearHigh: 199.62, yearLow: 164.08, marketCap: 2940000000000, priceAvg50: 185.20, priceAvg200: 178.50, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 187.15, previousClose: 187.15, eps: 6.58, pe: 28.80 },
-    'NVDA': { price: 875.32, changesPercentage: 3.45, change: 29.21, dayLow: 846.00, dayHigh: 882.50, yearHigh: 974.00, yearLow: 495.22, marketCap: 2150000000000, priceAvg50: 820.00, priceAvg200: 750.00, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 846.11, previousClose: 846.11, eps: 3.20, pe: 273.50 },
-    'SPY': { price: 522.18, changesPercentage: 0.87, change: 4.51, dayLow: 518.50, dayHigh: 523.80, yearHigh: 531.20, yearLow: 480.00, marketCap: 0, priceAvg50: 515.00, priceAvg200: 500.00, volume: 78234500, avgVolume: 75000000, exchange: 'NYSE', open: 517.67, previousClose: 517.67, eps: 22.10, pe: 23.60 },
-    'QQQ': { price: 448.72, changesPercentage: 1.15, change: 5.10, dayLow: 443.20, dayHigh: 450.50, yearHigh: 460.00, yearLow: 400.00, marketCap: 0, priceAvg50: 440.00, priceAvg200: 420.00, volume: 45234500, avgVolume: 42000000, exchange: 'NASDAQ', open: 443.62, previousClose: 443.62, eps: 9.80, pe: 45.80 },
-    'GLD': { price: 2184.30, changesPercentage: 0.45, change: 9.80, dayLow: 2170.00, dayHigh: 2195.00, yearHigh: 2250.00, yearLow: 1800.00, marketCap: 0, priceAvg50: 2150.00, priceAvg200: 2050.00, volume: 8423000, avgVolume: 8000000, exchange: 'NYSE', open: 2174.50, previousClose: 2174.50, eps: 0, pe: 0 },
-    'CL=F': { price: 93.12, changesPercentage: -1.23, change: -1.16, dayLow: 92.50, dayHigh: 94.80, yearHigh: 124.60, yearLow: 72.50, marketCap: 0, priceAvg50: 95.00, priceAvg200: 88.00, volume: 320000, avgVolume: 300000, exchange: 'NYMEX', open: 94.28, previousClose: 94.28, eps: 0, pe: 0 },
-    'TSLA': { price: 245.67, changesPercentage: -2.34, change: -5.88, dayLow: 242.00, dayHigh: 252.30, yearHigh: 299.29, yearLow: 138.80, marketCap: 780000000000, priceAvg50: 250.00, priceAvg200: 220.00, volume: 95234000, avgVolume: 90000000, exchange: 'NASDAQ', open: 251.55, previousClose: 251.55, eps: 4.20, pe: 58.50 },
-    'META': { price: 502.34, changesPercentage: 1.78, change: 8.78, dayLow: 493.00, dayHigh: 505.20, yearHigh: 531.49, yearLow: 350.00, marketCap: 1280000000000, priceAvg50: 485.00, priceAvg200: 440.00, volume: 18234000, avgVolume: 16000000, exchange: 'NASDAQ', open: 493.56, previousClose: 493.56, eps: 22.50, pe: 22.30 },
+    'GCUSD': { price: 4814.7, changesPercentage: 0.13, change: 6.4, dayLow: 4785.9, dayHigh: 4827.2, yearHigh: 5626.8, yearLow: 3123.3, marketCap: 0, priceAvg50: 4891.3, priceAvg200: 4377.5, volume: 28029, avgVolume: 25000, exchange: 'COMMODITY', open: 4811.8, previousClose: 4808.3, eps: 0, pe: 0 },
+    'AAPL': { price: 263.4, changesPercentage: 1.23, change: 3.2, dayLow: 260.0, dayHigh: 264.5, yearHigh: 270.0, yearLow: 200.0, marketCap: 4000000000000, priceAvg50: 255.0, priceAvg200: 240.0, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 260.5, previousClose: 260.2, eps: 6.58, pe: 40.0 },
+    'NVDA': { price: 198.35, changesPercentage: 3.45, change: 6.6, dayLow: 192.0, dayHigh: 200.5, yearHigh: 210.0, yearLow: 100.0, marketCap: 4800000000000, priceAvg50: 185.0, priceAvg200: 160.0, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 191.8, previousClose: 191.7, eps: 3.20, pe: 61.8 },
+    'TSLA': { price: 388.9, changesPercentage: -2.34, change: -9.3, dayLow: 382.0, dayHigh: 400.0, yearHigh: 420.0, yearLow: 250.0, marketCap: 1200000000000, priceAvg50: 370.0, priceAvg200: 340.0, volume: 95234000, avgVolume: 90000000, exchange: 'NASDAQ', open: 398.2, previousClose: 398.2, eps: 4.20, pe: 92.6 },
+    'SPY': { price: 701.66, changesPercentage: 0.87, change: 6.1, dayLow: 696.0, dayHigh: 703.0, yearHigh: 710.0, yearLow: 600.0, marketCap: 0, priceAvg50: 690.0, priceAvg200: 660.0, volume: 78234500, avgVolume: 75000000, exchange: 'NYSE', open: 695.6, previousClose: 695.6, eps: 22.10, pe: 31.8 },
+    'QQQ': { price: 640.47, changesPercentage: 1.15, change: 7.3, dayLow: 633.0, dayHigh: 642.0, yearHigh: 650.0, yearLow: 550.0, marketCap: 0, priceAvg50: 625.0, priceAvg200: 600.0, volume: 45234500, avgVolume: 42000000, exchange: 'NASDAQ', open: 633.2, previousClose: 633.2, eps: 9.80, pe: 65.4 },
+    'META': { price: 676.87, changesPercentage: 1.78, change: 11.8, dayLow: 665.0, dayHigh: 680.0, yearHigh: 690.0, yearLow: 500.0, marketCap: 1700000000000, priceAvg50: 650.0, priceAvg200: 600.0, volume: 18234000, avgVolume: 16000000, exchange: 'NASDAQ', open: 665.1, previousClose: 665.1, eps: 22.50, pe: 30.1 },
+    'MSFT': { price: 420.26, changesPercentage: 0.65, change: 2.7, dayLow: 417.0, dayHigh: 422.0, yearHigh: 430.0, yearLow: 370.0, marketCap: 3100000000000, priceAvg50: 410.0, priceAvg200: 390.0, volume: 22000000, avgVolume: 20000000, exchange: 'NASDAQ', open: 417.6, previousClose: 417.6, eps: 12.0, pe: 35.0 },
+    'AMZN': { price: 249.7, changesPercentage: 0.92, change: 2.3, dayLow: 247.0, dayHigh: 251.0, yearHigh: 260.0, yearLow: 180.0, marketCap: 2600000000000, priceAvg50: 240.0, priceAvg200: 220.0, volume: 30000000, avgVolume: 28000000, exchange: 'NASDAQ', open: 247.4, previousClose: 247.4, eps: 5.0, pe: 49.9 },
   };
 
   return symbols.map(symbol => ({
@@ -151,10 +201,10 @@ export function getMockNews(): NewsItem[] {
       url: '#',
     },
     {
-      symbol: 'CL=F',
+      symbol: 'GCUSD',
       publishedDate: new Date().toISOString(),
-      title: '호르무즈 해협 긴장 지속 — WTI 원유 93달러 대',
-      text: '이란-미국 협상 진행 속에서 원유 공급 불안이 이어지고 있다.',
+      title: '골드 $4,800 돌파 — 글로벌 불확실성 손실回避 수요 급증',
+      text: '지정학적 리스크와 인플레이션 우려로 금 가격이 사상 최고치를 경신하고 있다.',
       source: 'CNBC',
       image: '',
       url: '#',
@@ -183,15 +233,15 @@ export function getMockNews(): NewsItem[] {
 export function getMockChartData(): CandleData[] {
   const now = Date.now();
   const data: CandleData[] = [];
-  let price = 180;
+  let price = 4810;
 
   for (let i = 0; i < 100; i++) {
     const t = now - (100 - i) * 5 * 60 * 1000;
-    const change = (Math.random() - 0.48) * 2;
+    const change = (Math.random() - 0.48) * 4;
     const open = price;
     const close = price + change;
-    const high = Math.max(open, close) + Math.random() * 0.5;
-    const low = Math.min(open, close) - Math.random() * 0.5;
+    const high = Math.max(open, close) + Math.random() * 2;
+    const low = Math.min(open, close) - Math.random() * 2;
     data.push({
       timestamp: t,
       open: +open.toFixed(2),

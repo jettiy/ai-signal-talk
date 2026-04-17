@@ -52,11 +52,11 @@ export interface AiSignalResult {
   model: string;
 }
 
-// FMP 선물 심볼 (대시보드 기본 종목)
+// FMP 대시보드 기본 종목 (현재 구독에서 사용 가능한 심볼)
 export const FUTURES_SYMBOLS = {
-  NQ: { symbol: 'NQUSD', label: '나스닥선물', fmpChart: 'NQUSD' },
   GC: { symbol: 'GCUSD', label: '골드선물', fmpChart: 'GCUSD' },
-  CL: { symbol: 'CLUSD', label: 'WTI선물', fmpChart: 'CLUSD' },
+  AAPL: { symbol: 'AAPL', label: '애플', fmpChart: 'AAPL' },
+  NVDA: { symbol: 'NVDA', label: '엔비디아', fmpChart: 'NVDA' },
 } as const;
 
 export type FuturesTab = keyof typeof FUTURES_SYMBOLS;
