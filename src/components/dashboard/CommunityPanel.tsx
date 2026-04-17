@@ -250,10 +250,59 @@ export default function CommunityPanel() {
   const [activeChannel, setActiveChannel] = useState('general');
   const [activeMiniAsset, setActiveMiniAsset] = useState('NQUSD');
   const [activeTimeframe, setActiveTimeframe] = useState('1min');
+  const [chatMessages, setChatMessages] = useState<
+    { id: number; grade: string; nickname: string; msg: string; time: string; channel: string }[]
+  >(MOCK_MESSAGES);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const filteredMessages = activeChannel === 'general'
-    ? MOCK_MESSAGES
-    : MOCK_MESSAGES.filter((m) => m.channel === activeChannel);
+    ? chatMessages
+    : chatMessages.filter((m) => m.channel === activeChannel);
+
+  // AI 채팅 에이전트 호출
+  const handleSend = async () => {
+    if (!input.trim() || aiLoading) return;
+    const userMsg = input.trim();
+    setInput('');
+
+    // 사용자 메시지 추가
+    const userMsgObj = {
+      id: Date.now(),
+      grade: 'NEW',
+      nickname: '나',
+      msg: userMsg,
+      time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+      channel: activeChannel,
+    };
+    setChatMessages((prev) => [...prev, userMsgObj]);
+
+    // AI 응답
+    setAiLoading(true);
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMsg }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.content) {
+          const aiMsg = {
+            id: Date.now() + 1,
+            grade: 'BOT',
+            nickname: 'AI_ANALYST',
+            msg: data.content,
+            time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+            channel: activeChannel,
+          };
+          setChatMessages((prev) => [...prev, aiMsg]);
+        }
+      }
+    } catch {
+      // AI 응답 실패 시 조용히 무시
+    }
+    setAiLoading(false);
+  };
 
   const currentAsset = MINI_CHART_ASSETS.find((a) => a.id === activeMiniAsset) || MINI_CHART_ASSETS[0];
 
@@ -417,16 +466,24 @@ export default function CommunityPanel() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="메시지를 입력하세요..."
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
+              placeholder="AI에게 질문하세요... (예: 골드 지금 어때?)"
               className="flex-1 px-4 py-2.5 rounded-xl text-[12px] outline-none"
               style={{ background: '#111118', border: '1px solid #1A1A1A', color: 'white' }}
+              disabled={aiLoading}
             />
             <button
+              onClick={handleSend}
+              disabled={aiLoading || !input.trim()}
               className="px-4 py-2.5 rounded-xl font-bold text-[12px] cursor-pointer flex items-center gap-1.5 transition-all"
-              style={{ background: '#00FF41', color: '#000' }}
+              style={{
+                background: aiLoading ? '#333' : '#00FF41',
+                color: aiLoading ? '#666' : '#000',
+                opacity: !input.trim() ? 0.5 : 1,
+              }}
             >
               <Send size={12} />
-              전송
+              {aiLoading ? '분석중' : '전송'}
             </button>
           </div>
         </div>

@@ -1,12 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import CandlestickChart from '@/components/charts/CandlestickChart';
 import ProbabilityDonut from './signal/ProbabilityDonut';
 import PriceTargets from './signal/PriceTargets';
 import TradeHistory from './signal/TradeHistory';
 import EconomicCalendar from './signal/EconomicCalendar';
-import { Zap, History, BarChart3 } from 'lucide-react';
+import { Zap, History, BarChart3, Brain, ExternalLink, Loader2 } from 'lucide-react';
+import { useAiSignal } from '@/hooks/useAiSignal';
+import { useMarketData } from '@/hooks/useMarketData';
+import { useChartData } from '@/hooks/useChartData';
+import { useNews } from '@/hooks/useNews';
+import { AiSignalResult, FUTURES_SYMBOLS, getPredictionType } from '@/lib/types';
 
 // ── Timeframe 설정 ──────────────────────────────────────────────
 const TIMEFRAMES = [
@@ -22,13 +27,13 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
-  { id: 'NQUSD', label: '나스닥선물' },
   { id: 'GCUSD', label: '골드선물' },
-  { id: 'CLUSD', label: 'WTI원유' },
+  { id: 'AAPL', label: '애플' },
+  { id: 'NVDA', label: '엔비디아' },
 ] as const;
 
-// ── Mock 데이터: 시간프레임별 AI 시그널 ──────────────────────────
-const MOCK_SIGNALS: Record<TimeframeId, {
+// ── Fallback Mock (API 응답 없을 때) ──────────────────────────
+const FALLBACK_SIGNALS: Record<TimeframeId, {
   direction: 'buy' | 'sell';
   buyProb: number;
   sellProb: number;
@@ -42,80 +47,119 @@ const MOCK_SIGNALS: Record<TimeframeId, {
 }> = {
   '1min': {
     direction: 'buy', buyProb: 62, sellProb: 38,
-    entry: '21,285', stopLoss: '21,295', takeProfit: '21,305',
-    riskReward: '2.0', confidence: 58,
+    entry: '4,815', stopLoss: '4,808', takeProfit: '4,830',
+    riskReward: '2.1', confidence: 58,
     predictionType: '다음 봉 예측',
-    rationale: '1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지. 직전 3캔들 하락 모멘텀 약화.',
+    rationale: '1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지.',
   },
   '5min': {
     direction: 'sell', buyProb: 35, sellProb: 65,
-    entry: '21,283', stopLoss: '21,305', takeProfit: '21,245',
-    riskReward: '1.73', confidence: 65,
+    entry: '4,814', stopLoss: '4,830', takeProfit: '4,780',
+    riskReward: '2.1', confidence: 65,
     predictionType: '다음 봉 예측',
-    rationale: '5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환. 거래량 감소하며 상승 동력 소실.',
+    rationale: '5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환.',
   },
   '15min': {
     direction: 'buy', buyProb: 71, sellProb: 29,
-    entry: '21,280', stopLoss: '21,250', takeProfit: '21,340',
-    riskReward: '2.0', confidence: 71,
+    entry: '4,812', stopLoss: '4,795', takeProfit: '4,850',
+    riskReward: '2.2', confidence: 71,
     predictionType: '현재봉 마감',
-    rationale: '현재 15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생. 하락 쐐기 패턴 돌파.',
+    rationale: '15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생.',
   },
   '30min': {
     direction: 'buy', buyProb: 58, sellProb: 42,
-    entry: '21,275', stopLoss: '21,240', takeProfit: '21,330',
-    riskReward: '1.57', confidence: 58,
+    entry: '4,810', stopLoss: '4,790', takeProfit: '4,845',
+    riskReward: '1.75', confidence: 58,
     predictionType: '현재봉 마감',
-    rationale: '30분봉 EMA50 지지선 테스트 중. 현재봉 하꼬리 길게 형성. 매수세 유입 확인.',
+    rationale: '30분봉 EMA50 지지선 테스트 중. 매수세 유입 확인.',
   },
   '1hour': {
     direction: 'sell', buyProb: 40, sellProb: 60,
-    entry: '21,290', stopLoss: '21,340', takeProfit: '21,190',
-    riskReward: '2.0', confidence: 60,
+    entry: '4,820', stopLoss: '4,855', takeProfit: '4,760',
+    riskReward: '1.71', confidence: 60,
     predictionType: '현재봉 마감',
-    rationale: '1시간봉 더블탑 패턴 완성. RSI 70 과매수. 거래량 감소와 함께 상승 종료 신호.',
+    rationale: '1시간봉 더블탑 패턴 완성. RSI 70 과매수.',
   },
   '1day': {
     direction: 'buy', buyProb: 74, sellProb: 26,
-    entry: '21,250', stopLoss: '21,100', takeProfit: '21,500',
-    riskReward: '1.67', confidence: 74,
+    entry: '4,805', stopLoss: '4,750', takeProfit: '4,900',
+    riskReward: '1.73', confidence: 74,
     predictionType: '현재봉 마감',
-    rationale: '일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항. 기관 매수세 지속 추정.',
+    rationale: '일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항.',
   },
 };
-
-// ── Mock 캔들 데이터 생성 ────────────────────────────────────────
-function generateMockCandles(count: number) {
-  const data = [];
-  let base = 21250;
-  const now = Math.floor(Date.now() / 1000);
-
-  for (let i = 0; i < count; i++) {
-    const open = base + (Math.random() - 0.48) * 30;
-    const close = open + (Math.random() - 0.45) * 40;
-    const high = Math.max(open, close) + Math.random() * 15;
-    const low = Math.min(open, close) - Math.random() * 15;
-    data.push({
-      time: (now - (count - i) * 60) as any,
-      open: Math.round(open * 100) / 100,
-      high: Math.round(high * 100) / 100,
-      low: Math.round(low * 100) / 100,
-      close: Math.round(close * 100) / 100,
-    });
-    base = close;
-  }
-  return data;
-}
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────
 export default function SignalPanel() {
   const [timeframe, setTimeframe] = useState<TimeframeId>('15min');
-  const [asset, setAsset] = useState<string>('NQUSD');
+  const [asset, setAsset] = useState<string>('GCUSD');
   const [rightTab, setRightTab] = useState<'signal' | 'history'>('signal');
+  const [aiResult, setAiResult] = useState<AiSignalResult | null>(null);
 
-  const signal = MOCK_SIGNALS[timeframe];
+  // 실시간 시세
+  const { data: quotes } = useMarketData(asset);
+  const currentQuote = quotes?.[0];
+
+  // 차트 데이터
+  const { data: chartData } = useChartData(asset, timeframe);
+
+  // 뉴스
+  const { data: news } = useNews({ symbol: asset });
+
+  // AI 시그널
+  const signalMutation = useAiSignal();
+
+  // 시그널 자동 생성 (종목/시간프레임 변경 시)
+  const generateSignal = useCallback(() => {
+    if (!currentQuote) return;
+    signalMutation.mutate({
+      symbol: asset,
+      price: currentQuote.price,
+      changePct: currentQuote.changesPercentage,
+      news: (news || []).slice(0, 5).map((n) => ({
+        title: n.title,
+        text: n.text,
+        source: n.source,
+      })),
+      timeframe,
+    });
+  }, [asset, timeframe, currentQuote, news]);
+
+  // 종목/시간프레임 변경 시 자동 호출
+  useEffect(() => {
+    const timer = setTimeout(generateSignal, 500);
+    return () => clearTimeout(timer);
+  }, [generateSignal]);
+
+  // AI 결과 업데이트
+  useEffect(() => {
+    if (signalMutation.data) {
+      setAiResult(signalMutation.data);
+    }
+  }, [signalMutation.data]);
+
+  // 표시할 시그널 데이터 결정 (AI 결과 우선, 없으면 폴백)
+  const fallback = FALLBACK_SIGNALS[timeframe];
   const isShortTerm = timeframe === '1min' || timeframe === '5min';
-  const mockCandles = generateMockCandles(120);
+  const predictionType = getPredictionType(timeframe);
+
+  const displaySignal = aiResult
+    ? {
+        direction: (aiResult.signalType === 'LONG' ? 'buy' : 'sell') as 'buy' | 'sell',
+        buyProb: aiResult.buyProbability,
+        sellProb: aiResult.sellProbability,
+        entry: aiResult.entryPrice.toLocaleString(),
+        stopLoss: aiResult.stopLoss.toLocaleString(),
+        takeProfit: aiResult.targetPrice.toLocaleString(),
+        riskReward: aiResult.riskRewardRatio?.toString() || fallback.riskReward,
+        confidence: aiResult.confidence,
+        rationale: aiResult.rationale,
+        predictionType: aiResult.predictionType || predictionType,
+        reasoning: aiResult.reasoning,
+        sources: aiResult.sources,
+        model: aiResult.model,
+      }
+    : { ...fallback, reasoning: '', sources: [], model: '' };
 
   return (
     <div className="flex h-full" style={{ background: '#0A0A0F' }}>
@@ -140,6 +184,21 @@ export default function SignalPanel() {
               {a.label}
             </button>
           ))}
+          {/* 현재가 표시 */}
+          {currentQuote && (
+            <span className="ml-2 text-[11px] font-mono" style={{ color: '#999' }}>
+              ${currentQuote.price.toLocaleString()}
+              <span
+                className="ml-1"
+                style={{
+                  color: currentQuote.changesPercentage >= 0 ? '#00FF41' : '#FF3B3B',
+                }}
+              >
+                {currentQuote.changesPercentage >= 0 ? '+' : ''}
+                {currentQuote.changesPercentage.toFixed(2)}%
+              </span>
+            </span>
+          )}
           <span className="ml-auto text-[10px] font-mono" style={{ color: '#444' }}>
             {new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })} KST
           </span>
@@ -172,18 +231,33 @@ export default function SignalPanel() {
               color: isShortTerm ? '#00B4D8' : '#A855F7',
             }}
           >
-            {signal.predictionType}
+            {displaySignal.predictionType}
           </span>
+          {/* AI 모델 표시 */}
+          {displaySignal.model && (
+            <span
+              className="text-[9px] px-2 py-1 rounded ml-1"
+              style={{ background: 'rgba(0,255,65,0.05)', color: '#00FF41' }}
+            >
+              {displaySignal.model}
+            </span>
+          )}
         </div>
 
         {/* 차트 영역 */}
         <div className="flex-1 min-h-0" style={{ background: '#0A0A0F' }}>
           <CandlestickChart
-            data={mockCandles}
+            data={chartData?.map((d) => ({
+              time: (d.timestamp / 1000) as any,
+              open: d.open,
+              high: d.high,
+              low: d.low,
+              close: d.close,
+            })) || []}
             signal={{
-              entryPrice: parseFloat(signal.entry.replace(/,/g, '')),
-              targetPrice: parseFloat(signal.takeProfit.replace(/,/g, '')),
-              stopLoss: parseFloat(signal.stopLoss.replace(/,/g, '')),
+              entryPrice: aiResult?.entryPrice || parseFloat(fallback.entry.replace(/,/g, '')),
+              targetPrice: aiResult?.targetPrice || parseFloat(fallback.takeProfit.replace(/,/g, '')),
+              stopLoss: aiResult?.stopLoss || parseFloat(fallback.stopLoss.replace(/,/g, '')),
             }}
           />
         </div>
@@ -232,27 +306,32 @@ export default function SignalPanel() {
             <div className="p-4 space-y-4">
               {/* 종목 + 시간프레임 표시 */}
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-white">{asset}</span>
+                <span className="text-sm font-bold text-white">
+                  {ASSETS.find((a) => a.id === asset)?.label || asset}
+                </span>
                 <span className="text-[10px]" style={{ color: '#555' }}>
                   {TIMEFRAMES.find((t) => t.id === timeframe)?.label}
                 </span>
+                {signalMutation.isPending && (
+                  <Loader2 size={12} className="animate-spin" style={{ color: '#00FF41' }} />
+                )}
               </div>
 
               {/* 원형 확률 그래프 */}
               <ProbabilityDonut
-                direction={signal.direction}
-                buyProb={signal.buyProb}
-                sellProb={signal.sellProb}
-                predictionType={signal.predictionType}
+                direction={displaySignal.direction}
+                buyProb={displaySignal.buyProb}
+                sellProb={displaySignal.sellProb}
+                predictionType={displaySignal.predictionType}
               />
 
               {/* 진입/손절/목표가 + 손익비 */}
               <PriceTargets
-                direction={signal.direction}
-                entry={signal.entry}
-                stopLoss={signal.stopLoss}
-                takeProfit={signal.takeProfit}
-                riskReward={signal.riskReward}
+                direction={displaySignal.direction}
+                entry={displaySignal.entry}
+                stopLoss={displaySignal.stopLoss}
+                takeProfit={displaySignal.takeProfit}
+                riskReward={displaySignal.riskReward}
               />
 
               {/* 신뢰도 */}
@@ -265,27 +344,44 @@ export default function SignalPanel() {
                   <span
                     className="text-xs font-bold font-mono"
                     style={{
-                      color: signal.confidence >= 70 ? '#00FF41'
-                        : signal.confidence >= 50 ? '#FFD700' : '#FF3B3B',
+                      color: displaySignal.confidence >= 70 ? '#00FF41'
+                        : displaySignal.confidence >= 50 ? '#FFD700' : '#FF3B3B',
                     }}
                   >
-                    {signal.confidence}%
+                    {displaySignal.confidence}%
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#1A1A1A' }}>
                   <div
                     className="h-full rounded-full transition-all"
                     style={{
-                      width: `${signal.confidence}%`,
-                      background: signal.confidence >= 70
+                      width: `${displaySignal.confidence}%`,
+                      background: displaySignal.confidence >= 70
                         ? 'linear-gradient(90deg, #00FF41, #00CC33)'
-                        : signal.confidence >= 50
+                        : displaySignal.confidence >= 50
                           ? 'linear-gradient(90deg, #FFD700, #FFA500)'
                           : 'linear-gradient(90deg, #FF3B3B, #CC0000)',
                     }}
                   />
                 </div>
               </div>
+
+              {/* Thinking Mode 추론 (Z.AI 확장) */}
+              {displaySignal.reasoning && (
+                <div
+                  className="rounded-xl p-3"
+                  style={{ background: 'rgba(0,180,216,0.03)', border: '1px solid rgba(0,180,216,0.15)' }}
+                >
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Brain size={10} style={{ color: '#00B4D8' }} />
+                    <span className="text-[10px] font-bold" style={{ color: '#00B4D8' }}>AI 추론 과정</span>
+                  </div>
+                  <p className="text-[10px] leading-relaxed" style={{ color: '#7CB9D4' }}>
+                    {displaySignal.reasoning.slice(0, 300)}
+                    {displaySignal.reasoning.length > 300 ? '...' : ''}
+                  </p>
+                </div>
+              )}
 
               {/* 근거 요약 */}
               <div
@@ -297,15 +393,36 @@ export default function SignalPanel() {
                   <span className="text-[10px] font-bold" style={{ color: '#555' }}>근거 요약</span>
                 </div>
                 <p className="text-[11px] leading-relaxed" style={{ color: '#999' }}>
-                  {signal.rationale}
+                  {displaySignal.rationale}
                 </p>
-                <div
-                  className="mt-2 text-[9px] px-2 py-1 rounded"
-                  style={{ background: 'rgba(255,215,0,0.05)', color: '#FFD700' }}
-                >
-                  백엔드 구축 후 LLM 실시간 분석 연동 예정
-                </div>
               </div>
+
+              {/* 참조 소스 (Z.AI Web Search) */}
+              {displaySignal.sources?.length > 0 && (
+                <div
+                  className="rounded-xl p-3"
+                  style={{ background: '#111118', border: '1px solid #1A1A1A' }}
+                >
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <ExternalLink size={10} style={{ color: '#FFD700' }} />
+                    <span className="text-[10px] font-bold" style={{ color: '#555' }}>참조 소스</span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {displaySignal.sources.slice(0, 3).map((src, i) => (
+                      <a
+                        key={i}
+                        href={src.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block text-[10px] truncate hover:underline"
+                        style={{ color: '#7CB9D4' }}
+                      >
+                        {src.title || src.snippet?.slice(0, 60) || src.url}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <TradeHistory />

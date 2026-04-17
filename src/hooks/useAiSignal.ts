@@ -1,22 +1,13 @@
 'use client';
 import { useMutation } from '@tanstack/react-query';
-
-export interface AiSignalResult {
-  entryPrice: number;
-  targetPrice: number;
-  stopLoss: number;
-  confidence: number;
-  rationale: string;
-  timeframe: string;
-  signalType: 'LONG' | 'SHORT';
-  model: string;
-}
+import { AiSignalResult } from '@/lib/types';
 
 interface GenerateSignalParams {
   symbol: string;
   price: number;
   changePct: number;
   news: { title: string; text: string; source: string }[];
+  timeframe?: string;
 }
 
 export function useAiSignal() {

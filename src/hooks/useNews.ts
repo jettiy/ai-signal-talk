@@ -4,11 +4,25 @@ import { type NewsItem } from '@/lib/types';
 
 export type { NewsItem };
 
-export function useNews() {
+interface UseNewsOptions {
+  symbol?: string;
+  category?: 'macro' | 'commodity' | 'tech' | 'crypto';
+  label?: string;
+}
+
+export function useNews(options?: UseNewsOptions) {
+  const params = new URLSearchParams();
+  if (options?.symbol) params.set('symbol', options.symbol);
+  if (options?.category) params.set('category', options.category);
+  if (options?.label) params.set('label', options.label);
+
+  const qs = params.toString();
+  const url = `/api/news${qs ? `?${qs}` : ''}`;
+
   return useQuery<NewsItem[]>({
-    queryKey: ['news'],
+    queryKey: ['news', options?.symbol, options?.category],
     queryFn: async () => {
-      const res = await fetch('/api/news');
+      const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to fetch news');
       return res.json();
     },

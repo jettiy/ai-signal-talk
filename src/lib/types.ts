@@ -41,7 +41,9 @@ export interface CandleData {
   volume: number;
 }
 
+// ===== AI 시그널 결과 (확장 스키마) =====
 export interface AiSignalResult {
+  // 기존 필드 (하위 호환)
   entryPrice: number;
   targetPrice: number;
   stopLoss: number;
@@ -50,6 +52,47 @@ export interface AiSignalResult {
   timeframe: string;
   signalType: 'LONG' | 'SHORT';
   model: string;
+
+  // Z.AI 확장 필드
+  buyProbability: number;       // 매수 확률 (0~100)
+  sellProbability: number;      // 매도 확률 (0~100)
+  riskRewardRatio: number;      // 손익비
+  predictionType: string;       // "다음 봉 예측" | "현재봉 마감"
+  reasoning: string;            // Thinking Mode 추론 과정 (빈 문자열 가능)
+  sources: SignalSource[];      // 참조 소스 (웹검색 결과)
+}
+
+export interface SignalSource {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+// Z.AI 웹검색 결과
+export interface WebSearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+  siteName: string;
+  publishedDate?: string;
+}
+
+// 채팅 메시지 (Function Calling 에이전트)
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'tool' | 'system';
+  content: string;
+  reasoning_content?: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
+
+export interface ToolCall {
+  id: string;
+  type: 'function';
+  function: {
+    name: string;
+    arguments: string;
+  };
 }
 
 // FMP 대시보드 기본 종목 (현재 구독에서 사용 가능한 심볼)
@@ -69,6 +112,12 @@ export const TIMEFRAMES = [
   { label: '1H', value: '1hour' },
   { label: '1D', value: '1day' },
 ] as const;
+
+// 시간프레임 → 예측 타입 매핑
+export function getPredictionType(timeframe: string): string {
+  if (timeframe === '1min' || timeframe === '5min') return '다음 봉 예측';
+  return '현재봉 마감';
+}
 
 // 기존 주식 심볼 (참고용)
 export const TRACKED_SYMBOLS = [
