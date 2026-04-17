@@ -6,7 +6,7 @@ import {
   MessageCircle,
   Zap,
   Newspaper,
-  Settings,
+  Crown,
   LogOut,
 } from 'lucide-react';
 
@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { id: 'community', label: '커뮤니티', icon: MessageCircle },
   { id: 'signal', label: 'AI 시그널', icon: Zap },
   { id: 'news', label: '뉴스룸', icon: Newspaper },
-  { id: 'settings', label: '설정', icon: Settings },
+  { id: 'pro', label: 'PRO 전환', icon: Crown },
 ] as const;
 
 export type NavId = (typeof NAV_ITEMS)[number]['id'];
@@ -50,14 +50,30 @@ export default function Sidebar({ active, onNavigate }: SidebarProps) {
           className="w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer"
           style={{
             background:
-              active === id ? 'rgba(0,255,65,0.08)' : 'transparent',
-            color: active === id ? '#00FF41' : '#555',
-            border: `1px solid ${active === id ? 'rgba(0,255,65,0.2)' : 'transparent'}`,
+              active === id
+                ? id === 'pro'
+                  ? 'rgba(0,255,65,0.12)'
+                  : 'rgba(0,255,65,0.08)'
+                : 'transparent',
+            color: active === id
+              ? '#00FF41'
+              : id === 'pro'
+                ? '#00FF41'
+                : '#555',
+            border: `1px solid ${
+              active === id
+                ? 'rgba(0,255,65,0.2)'
+                : id === 'pro'
+                  ? 'rgba(0,255,65,0.1)'
+                  : 'transparent'
+            }`,
           }}
           title={label}
         >
           <Icon className="w-5 h-5" />
-          <span className="text-[9px] font-bold">{label}</span>
+          <span className={`text-[9px] font-bold ${id === 'pro' ? 'tracking-wide' : ''}`}>
+            {label}
+          </span>
         </button>
       ))}
 
