@@ -188,6 +188,7 @@ function FearGreedGauge() {
 
   const value = data?.value ?? 45;
   const classification = data?.valueClassification ?? 'Neutral';
+  const subs = data?.subIndicators ?? [];
 
   // 한국어 분류 매핑
   const classLabelMap: Record<string, string> = {
@@ -208,6 +209,22 @@ function FearGreedGauge() {
     return '#00FF41';
   }
 
+  function getRatingColor(rating: string): string {
+    const r = rating.toLowerCase();
+    if (r.includes('extreme fear')) return '#FF3B3B';
+    if (r.includes('fear')) return '#FF6B35';
+    if (r.includes('neutral')) return '#FFD700';
+    if (r.includes('extreme greed')) return '#00FF41';
+    if (r.includes('greed')) return '#7CFC00';
+    return '#888';
+  }
+
+  // 이전 값 비교
+  const prevClose = data?.previousClose ?? 0;
+  const prevWeek = data?.previous1Week ?? 0;
+  const prevMonth = data?.previous1Month ?? 0;
+  const diffFromClose = prevClose ? Math.round((value - prevClose) * 100) / 100 : 0;
+
   const gaugeColor = getGaugeColor(value);
 
   return (
@@ -218,16 +235,17 @@ function FearGreedGauge() {
       <div className="flex items-center gap-2 mb-3">
         <Activity size={12} style={{ color: gaugeColor }} />
         <span className="text-[11px] font-bold text-white">공포 & 탐욕 지수</span>
+        <span className="text-[8px] ml-auto font-mono" style={{ color: '#444' }}>CNN</span>
         {isLoading && <Loader2 size={10} className="animate-spin" style={{ color: '#555' }} />}
       </div>
 
       {/* 값 표시 */}
-      <div className="flex items-baseline gap-1.5 mb-2">
+      <div className="flex items-baseline gap-1.5 mb-1">
         <span
           className="text-3xl font-black font-mono"
           style={{ color: gaugeColor }}
         >
-          {value}
+          {Math.round(value)}
         </span>
         <span
           className="text-[11px] font-bold"
@@ -236,6 +254,18 @@ function FearGreedGauge() {
           {krLabel}
         </span>
       </div>
+
+      {/* 전일 대비 */}
+      {prevClose > 0 && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[9px]" style={{ color: diffFromClose >= 0 ? '#7CFC00' : '#FF6B35' }}>
+            전일대비 {diffFromClose >= 0 ? '▲' : '▼'} {Math.abs(diffFromClose).toFixed(1)}
+          </span>
+          <span className="text-[9px]" style={{ color: '#444' }}>
+            1주전 {Math.round(prevWeek)} · 1개월전 {Math.round(prevMonth)}
+          </span>
+        </div>
+      )}
 
       {/* 가로 막대 게이지 */}
       <div className="relative w-full h-2 rounded-full overflow-hidden" style={{ background: '#1A1A1A' }}>
@@ -274,6 +304,31 @@ function FearGreedGauge() {
         <span className="text-[8px] font-mono" style={{ color: '#FFD700' }}>중립</span>
         <span className="text-[8px] font-mono" style={{ color: '#00FF41' }}>극도탐욕</span>
       </div>
+
+      {/* 서브 지표 */}
+      {subs.length > 0 && (
+        <div className="mt-3 pt-3" style={{ borderTop: '1px solid #1A1A1A' }}>
+          <div className="grid grid-cols-2 gap-1.5">
+            {subs.map((sub) => {
+              const subColor = getRatingColor(sub.rating);
+              return (
+                <div key={sub.key} className="flex items-center justify-between py-1">
+                  <span className="text-[9px]" style={{ color: '#666' }}>{sub.label}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] font-bold font-mono" style={{ color: subColor }}>
+                      {Math.round(sub.score)}
+                    </span>
+                    <span
+                      className="w-1.5 h-1.5 rounded-full"
+                      style={{ background: subColor }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

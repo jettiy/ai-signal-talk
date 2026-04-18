@@ -141,35 +141,73 @@ export async function getHistoricalChart(
   }
 }
 
-// Fear & Greed Index 조회
-export async function getFearGreedIndex(): Promise<FearGreedIndex> {
-  if (!FMP_API_KEY) {
-    console.warn('FMP_API_KEY not set, returning mock Fear & Greed data');
-    return getMockFearGreedIndex();
-  }
+// Fear & Greed Index 조회 (CNN Markets)
+const CNN_FG_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+const CNN_FG_HEADERS: Record<string, string> = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+  'Accept': 'application/json',
+  'Referer': 'https://www.cnn.com/markets/fear-and-greed',
+  'Origin': 'https://www.cnn.com',
+};
 
+// CNN 서브 지표 키 → 한국어 라벨
+const CNN_SUB_LABELS: Record<string, string> = {
+  market_momentum_sp500: '시장 모멘텀',
+  stock_price_strength: '주가 강도',
+  stock_price_breadth: '주가 폭',
+  put_call_options: '풋/콜 옵션',
+  market_volatility_vix: 'VIX 변동성',
+  junk_bond_demand: '정크본드 수요',
+  safe_haven_demand: '안전자산 수요',
+};
+
+export async function getFearGreedIndex(): Promise<FearGreedIndex> {
   try {
-    const res = await fetch(
-      `${FMP_BASE}/fear-and-greed-index?apikey=${FMP_API_KEY}`,
-      { cache: 'no-store' } as RequestInit
-    );
-    if (!res.ok) throw new Error(`FMP Fear & Greed error: ${res.status}`);
+    const res = await fetch(CNN_FG_URL, {
+      headers: CNN_FG_HEADERS,
+      cache: 'no-store',
+    } as RequestInit);
+
+    if (!res.ok) throw new Error(`CNN Fear & Greed error: ${res.status}`);
     const data = await res.json();
 
-    if (!Array.isArray(data) || data.length === 0) {
+    const fg = data.fear_and_greed;
+    if (!fg || fg.score === undefined) {
       return getMockFearGreedIndex();
     }
 
-    const raw = data[0];
+    // 서브 지표 추출
+    const subIndicators: FearGreedIndex['subIndicators'] = [];
+    for (const [key, label] of Object.entries(CNN_SUB_LABELS)) {
+      const sub = data[key];
+      if (sub && sub.score !== undefined) {
+        subIndicators.push({
+          key,
+          label,
+          score: typeof sub.score === 'number' ? Math.round(sub.score * 10) / 10 : 0,
+          rating: sub.rating || '',
+        });
+      }
+    }
+
     return {
-      value: raw.value ?? 0,
-      valueClassification: raw.valueClassification ?? 'Neutral',
-      timestamp: raw.timestamp ?? new Date().toISOString(),
+      value: Math.round(fg.score * 100) / 100,
+      valueClassification: capitalizeRating(fg.rating || 'Neutral'),
+      timestamp: fg.timestamp || new Date().toISOString(),
+      previousClose: fg.previous_close ?? 0,
+      previous1Week: fg.previous_1_week ?? 0,
+      previous1Month: fg.previous_1_month ?? 0,
+      previous1Year: fg.previous_1_year ?? 0,
+      subIndicators,
     };
   } catch (error) {
-    console.error('FMP getFearGreedIndex error:', error);
+    console.error('CNN getFearGreedIndex error:', error);
     return getMockFearGreedIndex();
   }
+}
+
+function capitalizeRating(r: string): string {
+  return r.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 // ========== Mock Data (API 키 없을 때) ==========
@@ -291,5 +329,18 @@ export function getMockFearGreedIndex(): FearGreedIndex {
     value: 45,
     valueClassification: 'Fear',
     timestamp: new Date().toISOString(),
+    previousClose: 42,
+    previous1Week: 38,
+    previous1Month: 55,
+    previous1Year: 62,
+    subIndicators: [
+      { key: 'market_momentum_sp500', label: '시장 모멘텀', score: 35, rating: 'fear' },
+      { key: 'stock_price_strength', label: '주가 강도', score: 28, rating: 'extreme fear' },
+      { key: 'stock_price_breadth', label: '주가 폭', score: 42, rating: 'fear' },
+      { key: 'put_call_options', label: '풋/콜 옵션', score: 55, rating: 'neutral' },
+      { key: 'market_volatility_vix', label: 'VIX 변동성', score: 60, rating: 'greed' },
+      { key: 'junk_bond_demand', label: '정크본드 수요', score: 48, rating: 'neutral' },
+      { key: 'safe_haven_demand', label: '안전자산 수요', score: 30, rating: 'fear' },
+    ],
   };
 }

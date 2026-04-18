@@ -12,6 +12,9 @@ export function useFearGreed() {
       if (!res.ok) throw new Error('Failed to fetch Fear & Greed Index');
       return res.json();
     },
-    refetchInterval: 60000, // 1분마다 갱신
+    staleTime: 24 * 60 * 60 * 1000,     // 24시간 stale (캐시 유지)
+    refetchInterval: 24 * 60 * 60 * 1000, // 24시간마다 갱신
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 }

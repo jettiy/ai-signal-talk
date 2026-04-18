@@ -45,6 +45,18 @@ export interface FearGreedIndex {
   value: number;          // 0~100
   valueClassification: string;  // 'Extreme Fear' | 'Fear' | 'Neutral' | 'Greed' | 'Extreme Greed'
   timestamp: string;
+  previousClose: number;
+  previous1Week: number;
+  previous1Month: number;
+  previous1Year: number;
+  subIndicators: FearGreedSubIndicator[];
+}
+
+export interface FearGreedSubIndicator {
+  key: string;
+  label: string;        // 한국어 라벨
+  score: number;
+  rating: string;
 }
 
 // ===== AI 시그널 결과 (확장 스키마) =====
