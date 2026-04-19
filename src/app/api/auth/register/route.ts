@@ -13,10 +13,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const params = new URLSearchParams({ email, password, full_name });
-    const res = await fetch(`${BACKEND_URL}/api/users/register?${params}`, {
+    // 백엔드 실제 라우트: POST /register (JSON body)
+    const res = await fetch(`${BACKEND_URL}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, full_name }),
     });
 
     const data = await res.json();
