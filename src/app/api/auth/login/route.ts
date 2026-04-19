@@ -13,15 +13,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 백엔드는 OAuth2PasswordRequestForm = form-urlencoded 사용
-    const formBody = new URLSearchParams();
-    formBody.append('username', email);
-    formBody.append('password', password);
+    // 백엔드가 OAuth2 폼 형식(username + password)을 기대
+    const formData = new URLSearchParams();
+    formData.append('username', email);
+    formData.append('password', password);
 
     const res = await fetch(`${BACKEND_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formBody.toString(),
+      body: formData.toString(),
     });
 
     const data = await res.json();
@@ -33,32 +33,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 토큰만 있으면 사용자 정보를 /me에서 가져옴
-    let user = null;
-    if (data.access_token) {
-      try {
-        const meRes = await fetch(`${BACKEND_URL}/me`, {
-          headers: { 'Authorization': `Bearer ${data.access_token}` },
-        });
-        if (meRes.ok) {
-          user = await meRes.json();
-        }
-      } catch {
-        // /me 실패해도 로그인은 진행
-      }
-    }
-
-    return NextResponse.json({
-      access_token: data.access_token,
-      token_type: data.token_type || 'bearer',
-      user: user ? {
-        id: user.id,
-        email: user.email,
-        nickname: user.nickname,
-        level: user.level,
-        is_pro: user.is_pro,
-      } : { email },
-    });
+    return NextResponse.json(data);
   } catch {
     return NextResponse.json(
       { error: '서버 연결에 실패했습니다.' },
