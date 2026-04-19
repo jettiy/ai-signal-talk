@@ -1,24 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getFearGreedIndex } from '@/lib/fmp';
 
-// 서버 사이드 메모리 캐시 (24시간)
-let cachedData: { value: unknown; timestamp: number } | null = null;
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24시간
-
-export async function GET() {
-  // 캐시가 유효하면 반환
-  if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
-    return NextResponse.json(cachedData.value);
-  }
-
+export async function GET(req: NextRequest) {
   const data = await getFearGreedIndex();
 
-  // 캐시 업데이트
-  cachedData = { value: data, timestamp: Date.now() };
-
+  // ISR 캐싱: 5분마다 revalidate (Fear & Greed Index는 비교적 느리게 갱신됨)
   return NextResponse.json(data, {
     headers: {
-      'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=86400',
+      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
     },
   });
 }

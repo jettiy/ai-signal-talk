@@ -49,5 +49,10 @@ export async function GET(req: NextRequest) {
     return true;
   });
 
-  return NextResponse.json(uniqueNews.slice(0, 20));
+  // ISR 캐싱: 1분마다 revalidate (뉴스는 상대적으로 덜 빠르게 갱신됨)
+  return NextResponse.json(uniqueNews.slice(0, 20), {
+    headers: {
+      'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+    },
+  });
 }

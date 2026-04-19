@@ -8,32 +8,15 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const [idChecked, setIdChecked] = useState(false);
-  const [nickChecked, setNickChecked] = useState(false);
-  const [idError, setIdError] = useState('');
-  const [nickError, setNickError] = useState('');
   const [pwError, setPwError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const validatePassword = (pw: string) => {
     if (pw.length < 8) return '비밀번호는 8자 이상이어야 합니다.';
     if (!/[a-zA-Z]/.test(pw)) return '비밀번호에 영문자가 포함되어야 합니다.';
     if (!/[0-9]/.test(pw)) return '비밀번호에 숫자가 포함되어야 합니다.';
     return '';
-  };
-
-  const handleIdCheck = () => {
-    if (!id.trim()) { setIdError('아이디를 입력하세요.'); return; }
-    if (id.length < 4) { setIdError('아이디는 4자 이상이어야 합니다.'); return; }
-    setIdError('');
-    setIdChecked(true);
-  };
-
-  const handleNickCheck = () => {
-    if (!nickname.trim()) { setNickError('닉네임을 입력하세요.'); return; }
-    if (nickname.length < 2) { setNickError('닉네임은 2자 이상이어야 합니다.'); return; }
-    setNickError('');
-    setNickChecked(true);
   };
 
   const handlePwChange = (v: string) => {
@@ -43,17 +26,38 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!idChecked) { setIdError('아이디 중복확인을 해주세요.'); return; }
-    if (!nickChecked) { setNickError('닉네임 중복확인을 해주세요.'); return; }
+    if (!id.trim()) { setError('이메일을 입력하세요.'); return; }
+    if (!nickname.trim()) { setError('닉네임을 입력하세요.'); return; }
     const err = validatePassword(password);
     if (err) { setPwError(err); return; }
-    if (!agreed) return;
+    if (!agreed) { setError('이용약관에 동의해주세요.'); return; }
+
     setLoading(true);
-    // TODO: API call
-    setTimeout(() => { setLoading(false); window.location.href = '/signup/success'; }, 1500);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: id, password, full_name: nickname }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '회원가입에 실패했습니다.');
+      }
+
+      // 성공 → success 페이지로 이동
+      window.location.href = '/signup/success';
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '회원가입에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const isValid = idChecked && nickChecked && password.length >= 8 && agreed && !pwError;
+  const isValid = id.trim() && nickname.trim() && password.length >= 8 && agreed && !pwError;
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--bg-primary)' }}>
@@ -75,61 +79,47 @@ export default function SignupPage() {
           <h1 className="text-xl font-bold text-white mb-1">회원가입</h1>
           <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>신규 계정을 생성하고 터미널에 접속하세요.</p>
 
+          {error && (
+            <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: 'rgba(255, 59, 59, 0.1)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)' }}>
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* 아이디 */}
+            {/* 이메일 */}
             <div>
-              <label className="block text-xs font-medium mb-2 text-white">아이디</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-secondary)' }}>@</span>
-                  <input
-                    type="text"
-                    value={id}
-                    onChange={e => { setId(e.target.value); setIdChecked(false); setIdError(''); }}
-                    placeholder="user_id"
-                    className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
-                    style={{ background: 'var(--bg-tertiary)', border: `1px solid ${idError ? 'var(--accent-red)' : 'var(--border)'}`, color: 'var(--text-primary)' }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleIdCheck}
-                  className="px-4 py-3 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer"
-                  style={{ background: idChecked ? 'var(--accent-green)' : 'var(--bg-tertiary)', color: idChecked ? '#000' : 'var(--text-secondary)', border: `1px solid ${idChecked ? 'var(--accent-green)' : 'var(--border)'}` }}
-                >
-                  {idChecked ? '✓ 확인' : '중복확인'}
-                </button>
+              <label className="block text-xs font-medium mb-2 text-white">이메일</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-secondary)' }}>@</span>
+                <input
+                  type="email"
+                  value={id}
+                  onChange={e => { setId(e.target.value); setError(''); }}
+                  placeholder="name@example.com"
+                  required
+                  className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                />
               </div>
-              {idError && <p className="text-xs mt-1" style={{ color: 'var(--accent-red)' }}>{idError}</p>}
             </div>
 
             {/* 닉네임 */}
             <div>
               <label className="block text-xs font-medium mb-2 text-white">닉네임</label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
-                  </span>
-                  <input
-                    type="text"
-                    value={nickname}
-                    onChange={e => { setNickname(e.target.value); setNickChecked(false); setNickError(''); }}
-                    placeholder="Trader_X"
-                    className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
-                    style={{ background: 'var(--bg-tertiary)', border: `1px solid ${nickError ? 'var(--accent-red)' : 'var(--border)'}`, color: 'var(--text-primary)' }}
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={handleNickCheck}
-                  className="px-4 py-3 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer"
-                  style={{ background: nickChecked ? 'var(--accent-green)' : 'var(--bg-tertiary)', color: nickChecked ? '#000' : 'var(--text-secondary)', border: `1px solid ${nickChecked ? 'var(--accent-green)' : 'var(--border)'}` }}
-                >
-                  {nickChecked ? '✓ 확인' : '중복확인'}
-                </button>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+                </span>
+                <input
+                  type="text"
+                  value={nickname}
+                  onChange={e => { setNickname(e.target.value); setError(''); }}
+                  placeholder="Trader_X"
+                  required
+                  className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
+                  style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+                />
               </div>
-              {nickError && <p className="text-xs mt-1" style={{ color: 'var(--accent-red)' }}>{nickError}</p>}
             </div>
 
             {/* 비밀번호 */}
@@ -153,19 +143,19 @@ export default function SignupPage() {
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {showPw ? '🙈' : '👁️'}
+                  {showPw ? 'HIDE' : 'SHOW'}
                 </button>
               </div>
               {/* 비밀번호 강도 */}
               {password && (
                 <div className="mt-2 flex gap-1">
-                  {['length', 'alpha', 'num'].map((rule, i) => {
+                  {['length', 'alpha', 'num'].map((rule) => {
                     const ok = rule === 'length' ? password.length >= 8
                       : rule === 'alpha' ? /[a-zA-Z]/.test(password)
                       : /[0-9]/.test(password);
                     return (
                       <div key={rule} className="flex items-center gap-1 text-xs" style={{ color: ok ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
-                        <span>{ok ? '✓' : '○'}</span>
+                        <span>{ok ? 'O' : 'O'}</span>
                       </div>
                     );
                   })}
@@ -211,8 +201,8 @@ export default function SignupPage() {
 
         {/* Footer */}
         <div className="flex items-center justify-center gap-6 mt-6">
-          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>🛡️ ENCRYPTED</span>
-          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>☁️ SYSTEM STABLE</span>
+          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>ENCRYPTED</span>
+          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>SYSTEM STABLE</span>
         </div>
       </div>
     </div>

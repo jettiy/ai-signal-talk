@@ -7,12 +7,42 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setError('이메일과 비밀번호를 입력하세요.');
+      return;
+    }
+
     setLoading(true);
-    // TODO: NextAuth 로그인
-    setTimeout(() => setLoading(false), 1500);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '로그인에 실패했습니다.');
+      }
+
+      // JWT 토큰 저장
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // 대시보드로 이동
+      window.location.href = '/dashboard';
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -35,9 +65,15 @@ export default function LoginPage() {
           <h1 className="text-xl font-bold text-white mb-1">로그인</h1>
           <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>계정 정보를 입력하여 터미널에 접속하세요.</p>
 
+          {error && (
+            <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: 'rgba(255, 59, 59, 0.1)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)' }}>
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium mb-2 text-white">아이디</label>
+              <label className="block text-xs font-medium mb-2 text-white">이메일</label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--text-secondary)' }}>@</span>
                 <input
@@ -62,7 +98,7 @@ export default function LoginPage() {
                   type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="password"
                   required
                   className="w-full pl-9 pr-12 py-3 rounded-xl text-sm outline-none"
                   style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
@@ -73,7 +109,7 @@ export default function LoginPage() {
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-sm"
                   style={{ color: 'var(--text-secondary)' }}
                 >
-                  {showPw ? '🙈' : '👁️'}
+                  {showPw ? 'HIDE' : 'SHOW'}
                 </button>
               </div>
             </div>
@@ -107,10 +143,10 @@ export default function LoginPage() {
         {/* Footer Status */}
         <div className="flex items-center justify-center gap-6 mt-6">
           <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-            🛡️ ENCRYPTED
+            ENCRYPTED
           </span>
           <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-            ☁️ SYSTEM STABLE
+            SYSTEM STABLE
           </span>
         </div>
       </div>

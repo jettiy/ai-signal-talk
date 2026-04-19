@@ -2,15 +2,48 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 
-export default function LoginPage() {
+export default function LandingPage() {
   const [id, setId] = useState('');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: 백엔드 인증 연동
-    window.location.href = '/dashboard';
+    if (!id.trim() || !password.trim()) {
+      setError('이메일과 비밀번호를 입력하세요.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: id, password }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || '로그인에 실패했습니다.');
+      }
+
+      // JWT 토큰 저장
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // 대시보드로 이동
+      window.location.href = '/dashboard';
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -42,16 +75,23 @@ export default function LoginPage() {
             계정 정보를 입력하여 접속하세요
           </p>
 
+          {error && (
+            <div className="mb-4 p-3 rounded-xl text-sm" style={{ background: 'rgba(255, 59, 59, 0.1)', border: '1px solid var(--accent-red)', color: 'var(--accent-red)' }}>
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-medium mb-2 text-white">
-                아이디
+                이메일
               </label>
               <input
-                type="text"
+                type="email"
                 value={id}
                 onChange={(e) => setId(e.target.value)}
-                placeholder="아이디를 입력하세요"
+                placeholder="name@example.com"
+                required
                 className="input"
               />
             </div>
@@ -63,13 +103,14 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="비밀번호를 입력하세요"
+                placeholder="password"
+                required
                 className="input"
               />
             </div>
 
-            <button type="submit" className="btn-green">
-              접속하기
+            <button type="submit" className="btn-green" disabled={loading}>
+              {loading ? '접속 중...' : '접속하기'}
             </button>
           </form>
 
@@ -80,13 +121,13 @@ export default function LoginPage() {
             >
               계정이 없으신가요?{' '}
             </span>
-            <a
+            <Link
               href="/signup"
               className="text-xs font-semibold hover:underline"
               style={{ color: 'var(--accent-green)' }}
             >
               회원가입
-            </a>
+            </Link>
           </div>
         </div>
 
