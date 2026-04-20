@@ -116,7 +116,7 @@ export default function SignalPanel() {
   // AI 시그널
   const signalMutation = useAiSignal();
 
-  // 시그널 자동 생성 (종목/시간프레임 변경 시)
+  // 시그널 수동 생성 (버튼 클릭 시에만)
   const generateSignal = useCallback(() => {
     if (!currentQuote) return;
     signalMutation.mutate({
@@ -131,12 +131,6 @@ export default function SignalPanel() {
       timeframe,
     });
   }, [asset, timeframe, currentQuote, news]);
-
-  // 종목/시간프레임 변경 시 자동 호출
-  useEffect(() => {
-    const timer = setTimeout(generateSignal, 500);
-    return () => clearTimeout(timer);
-  }, [generateSignal]);
 
   // AI 결과 업데이트
   useEffect(() => {

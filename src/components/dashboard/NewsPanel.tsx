@@ -450,6 +450,11 @@ export default function NewsPanel() {
                   key={news.id}
                   className="rounded-xl p-4 transition-all cursor-pointer group"
                   style={{ background: '#111118', border: '1px solid #1A1A1A' }}
+                  onClick={() => {
+                    if (news.url && news.url !== '#') {
+                      window.open(news.url, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
                 >
                   {/* 상단: 임팩트 + 카테고리 + 시간 */}
                   <div className="flex items-center gap-2 mb-2">

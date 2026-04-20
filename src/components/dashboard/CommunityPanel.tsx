@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MessageCircle, Send, Newspaper, Clock, Flame, TrendingUp, TrendingDown,
-  Zap, BarChart3, Hash,
+  Zap, BarChart3, Hash, Loader2,
 } from 'lucide-react';
 import {
   createChart,
@@ -26,10 +26,6 @@ const GRADE_STYLES: Record<string, { color: string; bg: string }> = {
 // ── 채널 ──────────────────────────────────────────────────────
 const CHANNELS = [
   { id: 'general', label: '전체' },
-  { id: 'nq', label: '나스닥선물' },
-  { id: 'gc', label: '골드선물' },
-  { id: 'cl', label: 'WTI원유' },
-  { id: 'signal', label: '시그널 공유' },
 ];
 
 // ── Mock 메시지 ────────────────────────────────────────────────
@@ -254,6 +250,7 @@ export default function CommunityPanel() {
     { id: number; grade: string; nickname: string; msg: string; time: string; channel: string }[]
   >(MOCK_MESSAGES);
   const [aiLoading, setAiLoading] = useState(false);
+  const [signalLoading, setSignalLoading] = useState(false);
 
   const filteredMessages = activeChannel === 'general'
     ? chatMessages
@@ -384,21 +381,10 @@ export default function CommunityPanel() {
           <MessageCircle size={13} style={{ color: '#00FF41' }} />
           <span className="text-[11px] font-bold text-white mr-2">실시간 채팅</span>
 
-          {/* 채널 탭 */}
-          {CHANNELS.map((ch) => (
-            <button
-              key={ch.id}
-              onClick={() => setActiveChannel(ch.id)}
-              className="text-[9px] font-bold px-2 py-1 rounded-lg cursor-pointer transition-all"
-              style={{
-                background: activeChannel === ch.id ? 'rgba(0,255,65,0.1)' : 'transparent',
-                color: activeChannel === ch.id ? '#00FF41' : '#555',
-                border: activeChannel === ch.id ? '1px solid rgba(0,255,65,0.2)' : '1px solid transparent',
-              }}
-            >
-              {ch.label}
-            </button>
-          ))}
+          {/* 채널 탭 - 전체 통합 */}
+          <span className="text-[9px] font-bold px-2 py-1 rounded-lg" style={{ background: 'rgba(0,255,65,0.1)', color: '#00FF41', border: '1px solid rgba(0,255,65,0.2)' }}>
+            전체
+          </span>
 
           {/* 접속자 수 */}
           <span
@@ -620,14 +606,65 @@ export default function CommunityPanel() {
         {/* AI 시그널 분석 생성 버튼 */}
         <div className="shrink-0 px-4 py-3" style={{ borderTop: '1px solid #1A1A1A' }}>
           <button
+            onClick={async () => {
+              if (signalLoading) return;
+              setSignalLoading(true);
+              try {
+                const assetInfo = MINI_CHART_ASSETS.find(a => a.id === activeMiniAsset);
+                const res = await fetch('/api/ai-signal', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    symbol: activeMiniAsset,
+                    price: parseFloat(assetInfo?.price || '0'),
+                    changePct: parseFloat(assetInfo?.change || '0'),
+                    timeframe: activeTimeframe,
+                  }),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  const direction = data.signalType === 'LONG' ? '매수' : '매도';
+                  const msg = `🤖 AI 시그널: ${assetInfo?.label || activeMiniAsset} ${direction} | 진입가 ${data.entryPrice || '-'} | TP ${data.targetPrice || '-'} | SL ${data.stopLoss || '-'} | 신뢰도 ${data.confidence || '-'}%`;
+                  setChatMessages(prev => [...prev, {
+                    id: Date.now(),
+                    grade: 'BOT',
+                    nickname: 'SIGNAL_BOT',
+                    msg,
+                    time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+                    channel: 'general',
+                  }]);
+                }
+              } catch {
+                setChatMessages(prev => [...prev, {
+                  id: Date.now(),
+                  grade: 'BOT',
+                  nickname: 'SIGNAL_BOT',
+                  msg: '⚠️ 시그널 분석 요청 실패. 잠시 후 다시 시도해주세요.',
+                  time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+                  channel: 'general',
+                }]);
+              } finally {
+                setSignalLoading(false);
+              }
+            }}
+            disabled={signalLoading}
             className="w-full py-2.5 rounded-lg font-bold text-[11px] cursor-pointer flex items-center justify-center gap-1.5 transition-all"
             style={{
-              background: '#00FF41',
-              color: '#000',
+              background: signalLoading ? '#333' : '#00FF41',
+              color: signalLoading ? '#666' : '#000',
             }}
           >
-            <Zap size={12} />
-            AI시그널 분석 생성하기
+            {signalLoading ? (
+              <>
+                <Loader2 size={12} className="animate-spin" />
+                분석 중...
+              </>
+            ) : (
+              <>
+                <Zap size={12} />
+                AI시그널 분석 생성하기
+              </>
+            )}
           </button>
           <p className="text-[8px] text-center mt-1.5" style={{ color: '#333' }}>
             Quant Model V2.4.8 &copy; 2026 AI Signal Talk
