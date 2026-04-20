@@ -279,6 +279,191 @@ function extractJson(text: string): string {
   return m[0];
 }
 
+// ===== GLM-5V-Turbo 비전 분석 (차트 스크린샷 → 매매 시그널) =====
+export async function analyzeChartWithVision(
+  imageBase64: string,
+  symbol: string,
+  timeframe: string = '1hour'
+): Promise<AiSignalResult> {
+  if (!ZAI_API_KEY) {
+    throw new Error('ZAI_API_KEY not set — GLM-5V-Turbo requires Z.AI API key');
+  }
+
+  const visionPrompt = `너는 한국 전문 트레이더 AI 분석가야. 이 차트 이미지를 분석해서 매매 시그널을 생성해.
+
+종목: ${symbol}
+시간프레임: ${timeframe}
+
+차트의 기술적 패턴, 트렌드, 지지/저항선, 볼륨 등을 시각적으로 분석하고 반드시 아래 JSON 형식으로만 응답해:
+{
+  "entryPrice": 숫자,
+  "targetPrice": 숫자,
+  "stopLoss": 숫자,
+  "confidence": 숫자(0~100),
+  "rationale": "차트에서 관찰한 패턴과 시그널을 한국어로 2~3문장 설명",
+  "timeframe": "단기:1시간~3일 / 중기:1주~1개월",
+  "signalType": "LONG" 또는 "SHORT",
+  "buyProbability": 숫자(0~100),
+  "sellProbability": 숫자(0~100),
+  "riskRewardRatio": 숫자,
+  "predictionType": "다음 봉 예측" 또는 "현재봉 마감",
+  "chartPatterns": ["관찰된 차트 패턴 목록"],
+  "keyLevels": { "support": 숫자, "resistance": 숫자 }
+}
+
+규칙:
+- rationale은 반드시 한국어
+- JSON 외 텍스트 절대 금지
+- buyProbability + sellProbability = 100
+- confidence는 차트 패턴의 명확성 기준`;
+
+
+  try {
+    const body: Record<string, unknown> = {
+      model: 'glm-5v-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: imageBase64.startsWith('data:')
+                  ? imageBase64
+                  : `data:image/png;base64,${imageBase64}`,
+              },
+            },
+            {
+              type: 'text',
+              text: visionPrompt,
+            },
+          ],
+        },
+      ],
+      max_tokens: 4096,
+      temperature: 0.4,
+      thinking: { type: 'enabled' },
+    };
+
+    const res = await fetch(`${ZAI_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ZAI_API_KEY}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`GLM-5V-Turbo error: ${res.status}`, errText);
+      throw new Error(`GLM-5V-Turbo API error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    const message = data.choices?.[0]?.message;
+    if (!message) throw new Error('No response from GLM-5V-Turbo');
+
+    const reasoning = message.reasoning_content || '';
+    const content = message.content || '';
+    const parsed = JSON.parse(extractJson(content));
+
+    return {
+      ...mapParsedResult(parsed),
+      model: 'GLM-5V-Turbo (Vision)',
+      reasoning,
+    };
+  } catch (err) {
+    console.error('GLM-5V-Turbo vision analysis failed:', err);
+    throw err;
+  }
+}
+
+// 이미지 URL로 비전 분석 (공개 이미지용)
+export async function analyzeChartFromUrl(
+  imageUrl: string,
+  symbol: string,
+  timeframe: string = '1hour'
+): Promise<AiSignalResult> {
+  if (!ZAI_API_KEY) {
+    throw new Error('ZAI_API_KEY not set');
+  }
+
+  const visionPrompt = `너는 한국 전문 트레이더 AI 분석가야. 이 차트 이미지를 분석해서 매매 시그널을 생성해.
+
+종목: ${symbol}
+시간프레임: ${timeframe}
+
+차트의 기술적 패턴, 트렌드, 지지/저항선, 볼륨 등을 시각적으로 분석하고 반드시 아래 JSON 형식으로만 응답해:
+{
+  "entryPrice": 숫자,
+  "targetPrice": 숫자,
+  "stopLoss": 숫자,
+  "confidence": 숫자(0~100),
+  "rationale": "차트에서 관찰한 패턴과 시그널을 한국어로 2~3문장 설명",
+  "timeframe": "단기:1시간~3일 / 중기:1주~1개월",
+  "signalType": "LONG" 또는 "SHORT",
+  "buyProbability": 숫자(0~100),
+  "sellProbability": 숫자(0~100),
+  "riskRewardRatio": 숫자,
+  "predictionType": "다음 봉 예측" 또는 "현재봉 마감"
+}
+
+규칙: rationale은 반드시 한국어, JSON 외 텍스트 절대 금지, buyProbability + sellProbability = 100`;
+
+  try {
+    const body: Record<string, unknown> = {
+      model: 'glm-5v-turbo',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: { url: imageUrl },
+            },
+            {
+              type: 'text',
+              text: visionPrompt,
+            },
+          ],
+        },
+      ],
+      max_tokens: 4096,
+      temperature: 0.4,
+      thinking: { type: 'enabled' },
+    };
+
+    const res = await fetch(`${ZAI_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ZAI_API_KEY}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) throw new Error(`GLM-5V-Turbo API error: ${res.status}`);
+
+    const data = await res.json();
+    const message = data.choices?.[0]?.message;
+    if (!message) throw new Error('No response');
+
+    const reasoning = message.reasoning_content || '';
+    const content = message.content || '';
+    const parsed = JSON.parse(extractJson(content));
+
+    return {
+      ...mapParsedResult(parsed),
+      model: 'GLM-5V-Turbo (Vision)',
+      reasoning,
+    };
+  } catch (err) {
+    console.error('GLM-5V-Turbo URL analysis failed:', err);
+    throw err;
+  }
+}
+
 // ===== 메인 시그널 생성 함수 =====
 export async function generateAiSignal(ctx: {
   symbol: string;
