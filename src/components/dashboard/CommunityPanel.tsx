@@ -549,7 +549,7 @@ export default function CommunityPanel() {
             </div>
           )}
           {(newsData && newsData.length > 0 ? newsData : MOCK_NEWS).map((news: any, idx: number) => {
-            const impactInfo = (IMPACT_MAP as any)[news.impact as string] || IMPACT_MAP.medium;
+            const impactInfo = (IMPACT_MAP as Record<string, typeof IMPACT_MAP.medium>)[news.impact as string] || IMPACT_MAP.medium;
             const newsUrl = news.url && news.url !== '#' ? news.url : '';
             const newsTime = formatRelativeTime(news.publishedDate || news.time || new Date().toISOString());
             return (
