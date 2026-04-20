@@ -13,15 +13,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 백엔드 v2: OAuth2 token endpoint (form-urlencoded)
-    const formData = new URLSearchParams();
-    formData.append('username', email);
-    formData.append('password', password);
-
+    // 백엔드 v2: JSON body (form-urlencoded도 지원)
     const res = await fetch(`${BACKEND_URL}/api/v2/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: formData.toString(),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
     });
 
     const data = await res.json();

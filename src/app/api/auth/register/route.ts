@@ -29,16 +29,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 백엔드 v2: query parameter 방식
-    const params = new URLSearchParams({
-      email,
-      password,
-      nickname: nickname || '',
-    });
-
-    const res = await fetch(`${BACKEND_URL}/api/v2/users/register?${params.toString()}`, {
+    // 백엔드 v2: JSON body
+    const res = await fetch(`${BACKEND_URL}/api/v2/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, nickname }),
     });
 
     const data = await res.json();
