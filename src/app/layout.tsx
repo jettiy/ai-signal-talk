@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from 'react-hot-toast';
 import QueryProvider from '@/components/QueryProvider';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   title: 'AI 시그널톡 | 실시간 투자 시그널과 트레이더 커뮤니티',
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           />
           {children}
         </QueryProvider>
+        <SpeedInsights />
       </body>
     </html>
   );
