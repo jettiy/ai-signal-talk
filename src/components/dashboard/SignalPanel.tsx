@@ -33,12 +33,13 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
+  { id: 'NQUSD', label: '나스닥선물' },
   { id: 'GCUSD', label: '골드선물' },
-  { id: 'AAPL', label: '애플' },
-  { id: 'NVDA', label: '엔비디아' },
+  { id: 'CLUSD', label: 'WTI선물' },
 ] as const;
 
 // ── Fallback Mock (API 응답 없을 때) ──────────────────────────
+// 나스닥선물 기준 가격 (NQUSD ~21,285)
 const FALLBACK_SIGNALS: Record<TimeframeId, {
   direction: 'buy' | 'sell';
   buyProb: number;
@@ -53,43 +54,43 @@ const FALLBACK_SIGNALS: Record<TimeframeId, {
 }> = {
   '1min': {
     direction: 'buy', buyProb: 62, sellProb: 38,
-    entry: '4,815', stopLoss: '4,808', takeProfit: '4,830',
-    riskReward: '2.1', confidence: 58,
+    entry: '21,285', stopLoss: '21,275', takeProfit: '21,310',
+    riskReward: '2.5', confidence: 58,
     predictionType: '다음 봉 예측',
     rationale: '1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지.',
   },
   '5min': {
     direction: 'sell', buyProb: 35, sellProb: 65,
-    entry: '4,814', stopLoss: '4,830', takeProfit: '4,780',
-    riskReward: '2.1', confidence: 65,
+    entry: '21,290', stopLoss: '21,310', takeProfit: '21,240',
+    riskReward: '2.5', confidence: 65,
     predictionType: '다음 봉 예측',
     rationale: '5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환.',
   },
   '15min': {
     direction: 'buy', buyProb: 71, sellProb: 29,
-    entry: '4,812', stopLoss: '4,795', takeProfit: '4,850',
-    riskReward: '2.2', confidence: 71,
+    entry: '21,280', stopLoss: '21,250', takeProfit: '21,350',
+    riskReward: '2.3', confidence: 71,
     predictionType: '현재봉 마감',
     rationale: '15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생.',
   },
   '30min': {
     direction: 'buy', buyProb: 58, sellProb: 42,
-    entry: '4,810', stopLoss: '4,790', takeProfit: '4,845',
-    riskReward: '1.75', confidence: 58,
+    entry: '21,275', stopLoss: '21,240', takeProfit: '21,340',
+    riskReward: '1.86', confidence: 58,
     predictionType: '현재봉 마감',
     rationale: '30분봉 EMA50 지지선 테스트 중. 매수세 유입 확인.',
   },
   '1hour': {
     direction: 'sell', buyProb: 40, sellProb: 60,
-    entry: '4,820', stopLoss: '4,855', takeProfit: '4,760',
-    riskReward: '1.71', confidence: 60,
+    entry: '21,295', stopLoss: '21,340', takeProfit: '21,200',
+    riskReward: '2.1', confidence: 60,
     predictionType: '현재봉 마감',
     rationale: '1시간봉 더블탑 패턴 완성. RSI 70 과매수.',
   },
   '1day': {
     direction: 'buy', buyProb: 74, sellProb: 26,
-    entry: '4,805', stopLoss: '4,750', takeProfit: '4,900',
-    riskReward: '1.73', confidence: 74,
+    entry: '21,270', stopLoss: '21,100', takeProfit: '21,600',
+    riskReward: '1.94', confidence: 74,
     predictionType: '현재봉 마감',
     rationale: '일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항.',
   },
@@ -98,7 +99,7 @@ const FALLBACK_SIGNALS: Record<TimeframeId, {
 // ── 메인 컴포넌트 ────────────────────────────────────────────────
 export default function SignalPanel() {
   const [timeframe, setTimeframe] = useState<TimeframeId>('15min');
-  const [asset, setAsset] = useState<string>('GCUSD');
+  const [asset, setAsset] = useState<string>('NQUSD');
   const [rightTab, setRightTab] = useState<'signal' | 'history'>('signal');
   const [aiResult, setAiResult] = useState<AiSignalResult | null>(null);
 
