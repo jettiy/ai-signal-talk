@@ -235,9 +235,11 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
   if (!FMP_API_KEY) return getMockNews();
 
   try {
+    // tick=timestamp로 항상 새 데이터 강제 (FMP CDN 우회)
+    const tick = Date.now();
     const url = symbol
-      ? `${FMP_BASE}/news?symbol=${symbol}&limit=20&apikey=${FMP_API_KEY}`
-      : `${FMP_BASE}/news?limit=20&apikey=${FMP_API_KEY}`;
+      ? `${FMP_BASE}/news?symbol=${symbol}&limit=20&apikey=${FMP_API_KEY}&_t=${tick}`
+      : `${FMP_BASE}/news?limit=20&apikey=${FMP_API_KEY}&_t=${tick}`;
     const res = await fetch(url, { cache: 'no-store' } as RequestInit);
     if (!res.ok) throw new Error(`FMP News error: ${res.status}`);
     const data = await res.json();

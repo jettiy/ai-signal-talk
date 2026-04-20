@@ -14,6 +14,7 @@ import {
 } from 'lightweight-charts';
 import { useMarketData } from '@/hooks/useMarketData';
 import { useChartData } from '@/hooks/useChartData';
+import { useNews } from '@/hooks/useNews';
 
 // ── 등급 스타일 ────────────────────────────────────────────────
 const GRADE_STYLES: Record<string, { color: string; bg: string }> = {
@@ -120,6 +121,24 @@ const FALLBACK_CHART_DATA: Record<string, CandlestickData[]> = {
 // ── 등급 이니셜 ────────────────────────────────────────────
 function getInitials(nickname: string) {
   return nickname.slice(0, 2).toUpperCase();
+}
+
+// ── 상대 시간 포맷 ──────────────────────────────────────
+function formatRelativeTime(dateStr: string): string {
+  try {
+    const now = Date.now();
+    const published = new Date(dateStr).getTime();
+    const diffMin = Math.floor((now - published) / 60000);
+    if (diffMin < 1) return '방금 전';
+    if (diffMin < 60) return `${diffMin}분 전`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}시간 전`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 7) return `${diffDay}일 전`;
+    return dateStr.slice(0, 10);
+  } catch {
+    return '';
+  }
 }
 
 // ── 원형 신뢰도 게이지 ────────────────────────────────────
@@ -278,6 +297,9 @@ export default function CommunityPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
   // ── AI 시그널 결과 (버튼 클릭 시 저장) ──
   const [signalResult, setSignalResult] = useState<{ entryPrice?: number; targetPrice?: number; stopLoss?: number; confidence?: number; signalType?: string } | null>(null);
+
+  // ── 실시간 뉴스 (FMP + 한국어 번역) ──
+  const { data: newsData, isLoading: newsLoading } = useNews();
 
   // ── 실시간 시세 데이터 ──
   const { data: allQuotes } = useMarketData();
@@ -521,12 +543,22 @@ export default function CommunityPanel() {
 
         {/* 뉴스 리스트 */}
         <div className="flex-1 overflow-y-auto py-1">
-          {MOCK_NEWS.map((news) => {
-            const impactInfo = IMPACT_MAP[news.impact];
+          {newsLoading && (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 size={14} className="animate-spin" style={{ color: '#333' }} />
+            </div>
+          )}
+          {(newsData && newsData.length > 0 ? newsData : MOCK_NEWS).map((news: any, idx: number) => {
+            const impactInfo = (IMPACT_MAP as any)[news.impact as string] || IMPACT_MAP.medium;
+            const newsUrl = news.url && news.url !== '#' ? news.url : '';
+            const newsTime = formatRelativeTime(news.publishedDate || news.time || new Date().toISOString());
             return (
-              <div
-                key={news.id}
-                className="px-4 py-3 cursor-pointer transition-all hover:bg-white/[0.02]"
+              <a
+                key={news.title || idx}
+                href={newsUrl || undefined}
+                target={newsUrl ? '_blank' : undefined}
+                rel={newsUrl ? 'noopener noreferrer' : undefined}
+                className="block px-4 py-3 cursor-pointer transition-all hover:bg-white/[0.02]"
                 style={{ borderBottom: '1px solid rgba(26,26,26,0.5)' }}
               >
                 {/* 임팩트 + 시간 */}
@@ -540,7 +572,7 @@ export default function CommunityPanel() {
                   </span>
                   <span className="text-[8px] ml-auto flex items-center gap-0.5" style={{ color: '#444' }}>
                     <Clock size={7} />
-                    {news.time}
+                    {newsTime}
                   </span>
                 </div>
 
@@ -551,15 +583,22 @@ export default function CommunityPanel() {
 
                 {/* 관련 심볼 + 소스 */}
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className="text-[8px] font-bold font-mono px-1 py-0.5 rounded"
-                    style={{ background: '#0D0D0D', color: '#00FF41', border: '1px solid rgba(0,255,65,0.15)' }}
-                  >
-                    {news.symbol}
-                  </span>
-                  <span className="text-[8px] ml-auto" style={{ color: '#444' }}>{news.source}</span>
+                  {news.symbol && (
+                    <span
+                      className="text-[8px] font-bold font-mono px-1 py-0.5 rounded"
+                      style={{ background: '#0D0D0D', color: '#00FF41', border: '1px solid rgba(0,255,65,0.15)' }}
+                    >
+                      {news.symbol}
+                    </span>
+                  )}
+                  {news.source && (
+                    <span className="text-[8px] ml-auto" style={{ color: '#444' }}>{news.source}</span>
+                  )}
+                  {newsUrl && (
+                    <span className="text-[8px]" style={{ color: '#333' }}>↗</span>
+                  )}
                 </div>
-              </div>
+              </a>
             );
           })}
         </div>

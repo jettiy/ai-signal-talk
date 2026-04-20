@@ -1,8 +1,8 @@
 // SERVER ONLY — do not import from client components
 // Z.AI Web Search API — 실시간 금융 뉴스 + 시장 정보 검색
-// 3티어: 웹검색 요약은 GLM-4.7-FlashX (초고속 + 초저가)
+// 3티어: 웹검색 요약은 GLM-4.5-Air 한국어 배치 번역
 
-import { WebSearchResult } from './types';
+import { WebSearchResult, NewsItem } from './types';
 
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
 const ZAI_BASE = 'https://open.bigmodel.cn/api/paas/v4';
@@ -142,4 +142,97 @@ export async function webSearchInChat(
     console.warn('Z.AI Web Search in Chat failed:', err);
     return { answer: '', sources: [] };
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  FMP 영어 뉴스 → GLM-4.5-Air 한국어 배치 번역
+// ══════════════════════════════════════════════════════════════
+export async function translateNewsToKorean(
+  newsItems: NewsItem[]
+): Promise<NewsItem[]> {
+  if (!ZAI_API_KEY || newsItems.length === 0) return newsItems;
+
+  // 이미 한국어인 항목은 스킵
+  const needsTranslation = newsItems.filter(isLikelyEnglish);
+  const alreadyKorean = newsItems.filter((n) => !isLikelyEnglish(n));
+
+  if (needsTranslation.length === 0) return newsItems;
+
+  try {
+    const itemsJson = needsTranslation.map((n, i) => ({
+      index: i,
+      title: n.title,
+      text: n.text.slice(0, 300),
+    }));
+
+    const res = await fetch(`${ZAI_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ZAI_API_KEY}`,
+        'Accept-Language': 'ko-KR,ko;q=0.9',
+      },
+      body: JSON.stringify({
+        model: 'glm-4.5-air',
+        messages: [
+          {
+            role: 'system',
+            content: `너는 금융 뉴스 전문 번역가야. 영어 뉴스 제목과 요약을 자연스러운 한국어 경제/금융 용어로 번역해.
+
+반드시 아래 JSON 형식으로만 응답해. 다른 텍스트는 절대 포함하지 마:
+{"translations":[{"index":0,"title":"번역된 제목","text":"번역된 요약"}]}
+
+규칙:
+- 금융 전문 용어는 한국 외신 경제지 스타일로 번역
+- 숫자, 심볼, 퍼센트는 그대로 유지
+- title은 간결하고 임팩트 있게
+- text는 핵심 내용을 1~2문장으로 요약
+- JSON 외 텍스트 절대 금지`,
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(itemsJson),
+          },
+        ],
+        max_tokens: 2048,
+        temperature: 0.3,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn('뉴스 번역 API 에러:', res.status);
+      return newsItems;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    if (!content) return newsItems;
+
+    const parsed = JSON.parse(content);
+    const translations: Array<{ index: number; title: string; text: string }> =
+      parsed.translations || parsed.items || (Array.isArray(parsed) ? parsed : []);
+
+    if (!Array.isArray(translations) || translations.length === 0) return newsItems;
+
+    const translated = needsTranslation.map((item, i) => {
+      const t = translations.find((tr) => tr.index === i);
+      if (t && t.title) {
+        return { ...item, title: t.title, text: t.text || item.text };
+      }
+      return item;
+    });
+
+    return [...translated, ...alreadyKorean];
+  } catch (err) {
+    console.warn('뉴스 번역 실패:', err);
+    return newsItems;
+  }
+}
+
+function isLikelyEnglish(item: NewsItem): boolean {
+  const sample = (item.title + ' ' + item.text).slice(0, 100);
+  const koreanChars = (sample.match(/[가-힣]/g) || []).length;
+  const englishChars = (sample.match(/[a-zA-Z]/g) || []).length;
+  return englishChars > koreanChars * 2 && englishChars > 10;
 }
