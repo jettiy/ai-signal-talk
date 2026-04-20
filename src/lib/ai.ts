@@ -55,7 +55,8 @@ function buildUserPrompt(
   news: { title: string; text: string; source: string }[],
   changePct: number,
   timeframe: string,
-  webSearchResults?: WebSearchResult[]
+  webSearchResults?: WebSearchResult[],
+  indicators?: Record<string, unknown>
 ): string {
   const newsSection = news
     .slice(0, 5)
@@ -69,6 +70,34 @@ function buildUserPrompt(
         .join('\n')}`
     : '';
 
+  // 기술적 지표 섹션
+  let indicatorSection = '';
+  if (indicators) {
+    const parts: string[] = [];
+    if (indicators.rsi) {
+      const r = indicators.rsi as any;
+      parts.push(`RSI(14): ${r.value} [${r.signal}]`);
+    }
+    if (indicators.macd) {
+      const m = indicators.macd as any;
+      parts.push(`MACD: ${m.macd} / Signal: ${m.signal} / Histogram: ${m.histogram} [${m.crossover}]`);
+    }
+    if (indicators.bb) {
+      const b = indicators.bb as any;
+      parts.push(`Bollinger: Upper=${b.upper} Mid=${b.middle} Lower=${b.lower} %B=${b.percentB} [${b.position}]`);
+    }
+    if (indicators.stoch) {
+      const s = indicators.stoch as any;
+      parts.push(`Stochastic: %K=${s.k} %D=${s.d} [${s.signal}]`);
+    }
+    if (indicators.ema20) parts.push(`EMA(20): ${indicators.ema20}`);
+    if (indicators.sma50) parts.push(`SMA(50): ${indicators.sma50}`);
+    if (indicators.sma200) parts.push(`SMA(200): ${indicators.sma200}`);
+    if (parts.length > 0) {
+      indicatorSection = `\n\n기술적 지표 (실시간):\n${parts.join('\n')}`;
+    }
+  }
+
   const predictionType = getPredictionType(timeframe);
 
   return `종목: ${symbol} (ETF: ${ETF_MAP[symbol] || symbol})
@@ -78,7 +107,7 @@ function buildUserPrompt(
 예측유형: ${predictionType}
 
 최근 뉴스:
-${newsSection || '최근 주요 뉴스 없음'}${webSection}
+${newsSection || '최근 주요 뉴스 없음'}${webSection}${indicatorSection}
 
 위 데이터를 종합 분석해서 매매 시그널을 생성해. 가격은 ETF 실제 가격($${price}) 기준으로 entryPrice, stopLoss, targetPrice를 설정해.`;
 }
@@ -479,6 +508,7 @@ export async function generateAiSignal(ctx: {
   news: { title: string; text: string; source: string }[];
   timeframe?: string;
   webSearchResults?: WebSearchResult[];
+  indicators?: Record<string, unknown>;
 }): Promise<AiSignalResult> {
   const timeframe = ctx.timeframe || '1hour';
   const userPrompt = buildUserPrompt(
@@ -487,7 +517,8 @@ export async function generateAiSignal(ctx: {
     ctx.news,
     ctx.changePct,
     timeframe,
-    ctx.webSearchResults
+    ctx.webSearchResults,
+    ctx.indicators
   );
 
   // 1순위: DeepSeek V3.2 (빠르고 정확)

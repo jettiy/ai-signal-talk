@@ -33,6 +33,16 @@ export async function POST(req: NextRequest) {
   try {
     const { symbol, price, changePct, news, timeframe } = await req.json();
 
+    // Twelve Data 기술적 지표 조회
+    let indicators = null;
+    try {
+      const tf = timeframe || '15min';
+      const indicatorRes = await fetch(
+        `${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/indicators?symbol=${symbol}&timeframe=${tf}`
+      );
+      if (indicatorRes.ok) indicators = await indicatorRes.json();
+    } catch {}
+
     // Z.AI 웹검색으로 뉴스 보강
     let webSearchResults: import('@/lib/types').WebSearchResult[] = [];
     try {
@@ -51,6 +61,7 @@ export async function POST(req: NextRequest) {
       news: news || [],
       timeframe: timeframe || '1hour',
       webSearchResults,
+      indicators,
     });
 
     return NextResponse.json({ ...result, remaining });
