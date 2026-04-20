@@ -194,6 +194,7 @@ function ConfidenceGauge({ value, size = 80 }: { value: number; size?: number })
 function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: any[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const mountedRef = useRef(false);
 
   // chartData가 있으면 실제 데이터 사용, 없으면 폴백
   const displayData = chartData && chartData.length > 0
@@ -207,9 +208,9 @@ function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: an
     : (FALLBACK_CHART_DATA[symbol] || FALLBACK_CHART_DATA.GCUSD);
 
   const initChart = useCallback(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !mountedRef.current) return;
     if (chartRef.current) {
-      chartRef.current.remove();
+      try { chartRef.current.remove(); } catch {}
       chartRef.current = null;
     }
 
@@ -276,8 +277,9 @@ function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: an
   }, [symbol, displayData]);
 
   useEffect(() => {
+    mountedRef.current = true;
     const cleanup = initChart();
-    return () => { try { cleanup?.(); } catch {} };
+    return () => { mountedRef.current = false; try { cleanup?.(); } catch {} };
   }, [initChart]);
 
   return <div ref={containerRef} className="w-full h-full" />;
