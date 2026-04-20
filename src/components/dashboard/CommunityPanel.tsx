@@ -298,8 +298,8 @@ export default function CommunityPanel() {
   // ── AI 시그널 결과 (버튼 클릭 시 저장) ──
   const [signalResult, setSignalResult] = useState<{ entryPrice?: number; targetPrice?: number; stopLoss?: number; confidence?: number; signalType?: string } | null>(null);
 
-  // ── 실시간 뉴스 (FMP + 한국어 번역) ──
-  const { data: newsData, isLoading: newsLoading } = useNews();
+  // ── 실시간 뉴스 (FMP Breaking + 한국어 번역) ──
+  const { data: newsData, isLoading: newsLoading } = useNews({ mode: 'breaking' });
 
   // ── 실시간 시세 데이터 ──
   const { data: allQuotes } = useMarketData();
