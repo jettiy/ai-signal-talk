@@ -1,16 +1,20 @@
 // SERVER ONLY — do not import from client components
-// AI Client — 3티어 전략: GLM-5(시그널) + GLM-5-Turbo(채팅) + GLM-4.7-FlashX(요약)
-// + MiniMax/DeepSeek/GPT-4o (폴백 체인)
+// AI Client — DeepSeek V3.2 (1순위) → GLM-5 (2순위) → 규칙기반
+// DeepSeek: 빠르고 정확한 V3.2 모델 (속도 우선)
+// GLM-5: 깊은 추론 Thinking Mode (품질 백업)
 
 import { AiSignalResult, WebSearchResult, getPredictionType } from './types';
 
-// ===== Z.AI (3티어) =====
+// ===== API Keys =====
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
+
+// ===== Endpoints =====
+const DEEPSEEK_BASE = 'https://api.deepseek.com';
 const ZAI_BASE = 'https://open.bigmodel.cn/api/paas/v4';
 
-// 티어별 모델명
-export const MODEL_SIGNAL = 'glm-5';      // AI 시그널 — 깊은 추론, 품질 우선
-export const MODEL_CHAT = 'glm-5-turbo';  // 채팅 에이전트 — Function Calling 최적화, 속도 우선
+// 채팅용 모델 (zai-agent.ts에서 import)
+export const MODEL_CHAT = 'glm-4.5-air';  // 채팅 — 한국어 content 정상 출력
 
 // 시스템 프롬프트 (Context Caching 대상 — 반복 사용)
 const SIGNAL_SYSTEM_PROMPT = `너는 한국 전문 트레이더 AI 분석가야. 주어진 종목의 실시간 시세, 뉴스, 기술적 지표를 종합 분석해서 매매 시그널을 생성해.
@@ -72,7 +76,49 @@ ${newsSection || '최근 주요 뉴스 없음'}${webSection}
 위 데이터를 종합 분석해서 매매 시그널을 생성해.`;
 }
 
-// Z.AI GLM-5.1 호출 (Thinking Mode + Structured Output)
+// ===== 1순위: DeepSeek V3.2 (속도 우선) =====
+async function callDeepSeekSignal(
+  userPrompt: string
+): Promise<AiSignalResult | null> {
+  if (!DEEPSEEK_API_KEY) return null;
+
+  try {
+    const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: SIGNAL_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        max_tokens: 4096,
+        temperature: 0.6,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (!res.ok) {
+      console.warn(`DeepSeek V3.2 error: ${res.status}`);
+      return null;
+    }
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || '';
+    if (!content) return null;
+
+    const parsed = JSON.parse(extractJson(content));
+    return { ...mapParsedResult(parsed), model: 'DeepSeek V3.2' };
+  } catch (err) {
+    console.warn('DeepSeek V3.2 call failed:', err);
+    return null;
+  }
+}
+
+// ===== 2순위: Z.AI GLM-5 (Thinking Mode + Structured Output) =====
 async function callZaiGLM(
   userPrompt: string,
   withThinking = true
@@ -81,7 +127,7 @@ async function callZaiGLM(
 
   try {
     const body: Record<string, unknown> = {
-      model: MODEL_SIGNAL,
+      model: 'glm-5',
       messages: [
         { role: 'system', content: SIGNAL_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
@@ -108,7 +154,7 @@ async function callZaiGLM(
     });
 
     if (!res.ok) {
-      console.warn(`Z.AI GLM-5.1 error: ${res.status}`);
+      console.warn(`Z.AI GLM-5 error: ${res.status}`);
       return null;
     }
 
@@ -123,30 +169,14 @@ async function callZaiGLM(
     const content = message.content || '';
     const parsed = JSON.parse(extractJson(content));
 
-    return {
-      entryPrice: Number(parsed.entryPrice) || 0,
-      targetPrice: Number(parsed.targetPrice) || 0,
-      stopLoss: Number(parsed.stopLoss) || 0,
-      confidence: Number(parsed.confidence) || 50,
-      rationale: parsed.rationale || '',
-      timeframe: parsed.timeframe || '단기:1시간~3일',
-      signalType: parsed.signalType === 'LONG' ? 'LONG' : 'SHORT',
-      model: 'GLM-5',
-      // Z.AI 확장 필드
-      buyProbability: Number(parsed.buyProbability) || 50,
-      sellProbability: Number(parsed.sellProbability) || 50,
-      riskRewardRatio: Number(parsed.riskRewardRatio) || 0,
-      predictionType: parsed.predictionType || '',
-      reasoning,
-      sources: [],
-    };
+    return { ...mapParsedResult(parsed), model: 'GLM-5', reasoning };
   } catch (err) {
-    console.warn('Z.AI GLM-5.1 call failed:', err);
+    console.warn('Z.AI GLM-5 call failed:', err);
     return null;
   }
 }
 
-// Z.AI GLM-5.1 스트리밍 호출 (Thinking Mode 포함)
+// Z.AI GLM-5 스트리밍 호출 (Thinking Mode 포함)
 export async function callZaiGLMStream(
   userPrompt: string,
   onThinking: (chunk: string) => void,
@@ -156,7 +186,7 @@ export async function callZaiGLMStream(
   if (!ZAI_API_KEY) throw new Error('ZAI_API_KEY not set');
 
   const body: Record<string, unknown> = {
-    model: MODEL_SIGNAL,
+    model: 'glm-5',
     messages: [
       { role: 'system', content: SIGNAL_SYSTEM_PROMPT },
       { role: 'user', content: userPrompt },
@@ -220,58 +250,10 @@ export async function callZaiGLMStream(
   return fullContent;
 }
 
-// ===== 기존 폴백 모델 (유지) =====
+// ===== 공통 유틸 =====
 
-async function callMinimax(prompt: string): Promise<AiSignalResult | null> {
-  const key = process.env.MINIMAX_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch('https://api.minimax.chat/v1/text/chatcompletion_pro', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ model: 'MiniMax-Text-01', messages: [{ role: 'user', content: prompt }], max_tokens: 1024, temperature: 0.3 }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const parsed = JSON.parse(extractJson(data.choices?.[0]?.message?.content || '{}'));
-    return { ...mapLegacyResult(parsed), model: 'MiniMax MiMo' };
-  } catch { return null; }
-}
-
-async function callDeepSeek(prompt: string): Promise<AiSignalResult | null> {
-  const key = process.env.DEEPSEEK_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: prompt }], max_tokens: 1024, temperature: 0.3 }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const parsed = JSON.parse(extractJson(data.choices?.[0]?.message?.content || '{}'));
-    return { ...mapLegacyResult(parsed), model: 'DeepSeek' };
-  } catch { return null; }
-}
-
-async function callOpenAI(prompt: string): Promise<AiSignalResult | null> {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return null;
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-      body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: prompt }], max_tokens: 1024, temperature: 0.3 }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const parsed = JSON.parse(extractJson(data.choices?.[0]?.message?.content || '{}'));
-    return { ...mapLegacyResult(parsed), model: 'GPT-4o' };
-  } catch { return null; }
-}
-
-// 기존 폴백 결과 → 확장 스키마 매핑
-function mapLegacyResult(parsed: Record<string, unknown>): Omit<AiSignalResult, 'model'> {
+// 파싱 결과 → AiSignalResult 매핑
+function mapParsedResult(parsed: Record<string, unknown>): Omit<AiSignalResult, 'model'> {
   const signalType = parsed.signalType === 'LONG' ? 'LONG' : 'SHORT';
   const confidence = Number(parsed.confidence) || 50;
   return {
@@ -282,10 +264,10 @@ function mapLegacyResult(parsed: Record<string, unknown>): Omit<AiSignalResult, 
     rationale: String(parsed.rationale || ''),
     timeframe: String(parsed.timeframe || '단기:1시간~3일'),
     signalType,
-    buyProbability: signalType === 'LONG' ? confidence : 100 - confidence,
-    sellProbability: signalType === 'SHORT' ? confidence : 100 - confidence,
-    riskRewardRatio: 0,
-    predictionType: '',
+    buyProbability: Number(parsed.buyProbability) || (signalType === 'LONG' ? confidence : 100 - confidence),
+    sellProbability: Number(parsed.sellProbability) || (signalType === 'SHORT' ? confidence : 100 - confidence),
+    riskRewardRatio: Number(parsed.riskRewardRatio) || 0,
+    predictionType: String(parsed.predictionType || ''),
     reasoning: '',
     sources: [],
   };
@@ -316,10 +298,22 @@ export async function generateAiSignal(ctx: {
     ctx.webSearchResults
   );
 
-  // 1순위: Z.AI GLM-5.1 (Thinking Mode + Structured Output)
+  // 1순위: DeepSeek V3.2 (빠르고 정확)
+  const dsResult = await callDeepSeekSignal(userPrompt);
+  if (dsResult) {
+    if (ctx.webSearchResults?.length) {
+      dsResult.sources = ctx.webSearchResults.slice(0, 5).map((r) => ({
+        title: r.title,
+        url: r.url,
+        snippet: r.snippet,
+      }));
+    }
+    return dsResult;
+  }
+
+  // 2순위: Z.AI GLM-5 (Thinking Mode + 깊은 추론)
   const zaiResult = await callZaiGLM(userPrompt, true);
   if (zaiResult) {
-    // 웹검색 소스 첨부
     if (ctx.webSearchResults?.length) {
       zaiResult.sources = ctx.webSearchResults.slice(0, 5).map((r) => ({
         title: r.title,
@@ -328,28 +322,6 @@ export async function generateAiSignal(ctx: {
       }));
     }
     return zaiResult;
-  }
-
-  // 2~4순위: 기존 폴백 체인 (MiniMax → DeepSeek → GPT-4o)
-  const legacyPrompt = buildUserPrompt(ctx.symbol, ctx.price, ctx.news, ctx.changePct, timeframe);
-  const fallbacks = await Promise.allSettled([
-    callMinimax(legacyPrompt),
-    callDeepSeek(legacyPrompt),
-    callOpenAI(legacyPrompt),
-  ]);
-
-  for (const r of fallbacks) {
-    if (r.status === 'fulfilled' && r.value) {
-      // 폴백 결과에도 웹검색 소스 첨부
-      if (ctx.webSearchResults?.length) {
-        r.value.sources = ctx.webSearchResults.slice(0, 5).map((s) => ({
-          title: s.title,
-          url: s.url,
-          snippet: s.snippet,
-        }));
-      }
-      return r.value;
-    }
   }
 
   // 최종 폴백: 규칙 기반
