@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Activity,
   MessageSquare,
+  Loader2,
 } from 'lucide-react';
 import {
   BarChart,
@@ -530,6 +531,7 @@ interface StatsResponse {
 }
 
 export default function AdminPage() {
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('admin');
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -537,6 +539,10 @@ export default function AdminPage() {
   const [growthData, setGrowthData] = useState<{ date: string; users: number }[]>([]);
   const [growthLoading, setGrowthLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     (async () => {
@@ -670,6 +676,7 @@ export default function AdminPage() {
             >
               <h3 className="text-sm font-bold mb-4" style={{ color: '#FFF' }}>사용자 증가 추이</h3>
               <div className="h-64">
+                {mounted && growthData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={growthData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1A1A1A" />
@@ -697,6 +704,11 @@ export default function AdminPage() {
                     <Bar dataKey="users" fill="#00FF41" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+                ) : growthLoading ? (
+                  <div className="flex items-center justify-center h-full"><Loader2 size={24} className="animate-spin" style={{ color: '#333' }} /></div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-xs" style={{ color: '#555' }}>데이터 없음</div>
+                )}
               </div>
             </div>
 
