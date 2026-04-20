@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     formData.append('username', email);
     formData.append('password', password);
 
-    const res = await fetch(`${BACKEND_URL}/login`, {
+    const res = await fetch(`${BACKEND_URL}/api/v2/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: formData.toString(),

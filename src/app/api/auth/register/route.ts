@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 백엔드가 nickname 필드를 기대
-    const res = await fetch(`${BACKEND_URL}/register`, {
+    const res = await fetch(`${BACKEND_URL}/api/v2/users/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, nickname }),
