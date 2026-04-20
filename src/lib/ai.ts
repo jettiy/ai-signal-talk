@@ -6,7 +6,7 @@ import { AiSignalResult, WebSearchResult, getPredictionType } from './types';
 
 // ===== Z.AI (3티어) =====
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
-const ZAI_BASE = 'https://api.z.ai/api/paas/v4';
+const ZAI_BASE = 'https://open.bigmodel.cn/api/paas/v4';
 
 // 티어별 모델명
 export const MODEL_SIGNAL = 'glm-5';      // AI 시그널 — 깊은 추론, 품질 우선
