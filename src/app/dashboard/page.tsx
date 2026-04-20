@@ -10,6 +10,7 @@ import SignalPanel from '@/components/dashboard/SignalPanel';
 import NewsPanel from '@/components/dashboard/NewsPanel';
 import ProPanel from '@/components/dashboard/ProPanel';
 import AdminPanel from '@/components/dashboard/AdminPanel';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import type { UserRole } from '@/lib/types';
 
 interface UserInfo {
@@ -110,11 +111,13 @@ export default function DashboardPage() {
         {safeTab !== 'pro' && safeTab !== 'admin' && <TickerBar />}
 
         <main className="flex-1 overflow-hidden">
-          {safeTab === 'community' && <CommunityPanel />}
-          {safeTab === 'signal' && <SignalPanel />}
-          {safeTab === 'news' && <NewsPanel />}
-          {safeTab === 'pro' && <ProPanel userRole={userRole} userName={userName} />}
-          {safeTab === 'admin' && userRole === 'ADMIN' && <AdminPanel />}
+          <ErrorBoundary>
+            {safeTab === 'community' && <CommunityPanel />}
+            {safeTab === 'signal' && <SignalPanel />}
+            {safeTab === 'news' && <NewsPanel />}
+            {safeTab === 'pro' && <ProPanel userRole={userRole} userName={userName} />}
+            {safeTab === 'admin' && userRole === 'ADMIN' && <AdminPanel />}
+          </ErrorBoundary>
         </main>
 
         {safeTab !== 'pro' && safeTab !== 'admin' && <StatusBar />}
