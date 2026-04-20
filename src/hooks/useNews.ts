@@ -26,6 +26,6 @@ export function useNews(options?: UseNewsOptions) {
       if (!res.ok) throw new Error('Failed to fetch news');
       return res.json();
     },
-    refetchInterval: 30000,
+    refetchInterval: 600000, // 10분마다 자동 업데이트
   });
 }

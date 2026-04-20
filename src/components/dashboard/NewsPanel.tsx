@@ -67,6 +67,7 @@ interface NewsUiItem {
   summary: string;
   relatedSymbols: string[];
   url: string;
+  image: string;
 }
 
 // ── NewsItem → NewsUiItem 변환 ────────────────────────────────
@@ -81,6 +82,7 @@ function transformNewsItem(item: NewsItem, index: number): NewsUiItem {
     summary: item.text || item.title,
     relatedSymbols: item.symbol ? [item.symbol] : [],
     url: item.url,
+    image: item.image || '',
   };
 }
 
@@ -96,6 +98,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     summary: '미 연방준비제도가 기준금리를 동결하기로 결정했습니다. 파월 의장은 인플레이션이 2% 목표치를 향해 지속적으로 완화되는 것을 더 봐야 한다고 밝혔습니다.',
     relatedSymbols: ['NQUSD', 'GCUSD'],
     url: 'https://www.reuters.com',
+    image: '',
   },
   {
     id: 'fallback-2',
@@ -107,6 +110,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     summary: '금값이 사상 최고치를 경신하며 $4,800을 돌파했습니다. 세계 중앙은행들의 꾸준한 골드 매입과 중동 지정학적 긴장이 상승을 견인하고 있습니다.',
     relatedSymbols: ['GCUSD'],
     url: 'https://www.bloomberg.com',
+    image: '',
   },
   {
     id: 'fallback-3',
@@ -118,6 +122,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     summary: '엔비디아가 다음 분기 매출 가이던스를 상향 조정했습니다. 데이터센터 AI 칩 수요가 여전히 공급을 초과하며, 블랙웰 아키텍처 출하량이 가속화되고 있습니다.',
     relatedSymbols: ['NVDA', 'NQUSD'],
     url: 'https://www.cnbc.com',
+    image: '',
   },
   {
     id: 'fallback-4',
@@ -129,6 +134,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     summary: 'OPEC+가 자발적 감산을 3개월 연장하기로 합의했습니다. 이로 인해 WTI 원유가 $65 수준을 회복했으며, 단기 공급 우려가 완화되었습니다.',
     relatedSymbols: ['CLUSD'],
     url: 'https://www.reuters.com',
+    image: '',
   },
   {
     id: 'fallback-5',
@@ -140,6 +146,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     summary: '미국 스팟 비트코인 ETF에 일일 $2.1B 자금이 유입되며 사상 최대 기록을 세웠습니다.',
     relatedSymbols: ['BTCUSD'],
     url: 'https://www.coindesk.com',
+    image: '',
   },
   {
     id: 'fallback-6',
@@ -151,6 +158,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     summary: '애플이 아이폰 17 시리즈의 부품 주문량을 전작 대비 20% 늘렸다고 닛케이가 보도했습니다.',
     relatedSymbols: ['AAPL'],
     url: 'https://asia.nikkei.com',
+    image: '',
   },
 ];
 
@@ -396,7 +404,16 @@ export default function NewsPanel() {
                     <div className="flex flex-col md:flex-row">
                       {/* 이미지/플레이스홀더 */}
                       <div className="w-full md:w-2/5 bg-zinc-800 relative h-48 md:h-auto min-h-[200px]">
-                        <div className="absolute inset-0 bg-gradient-to-b from-zinc-700 to-zinc-900" />
+                        {heroNews.image ? (
+                          <img
+                            src={heroNews.image}
+                            alt={heroNews.title}
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-br from-zinc-700 via-zinc-800 to-zinc-900" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                         <HeroImpactBadge impact={heroNews.impact} />
                         <div className="absolute bottom-3 right-3">
                           <ExternalLink size={14} className="text-zinc-500" />
@@ -436,29 +453,40 @@ export default function NewsPanel() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {subNews.map((news) => (
                     <NewsLink key={news.id} url={news.url}>
-                      <div className="block bg-[#121212] border border-zinc-800 p-5 rounded-xl hover:border-zinc-500 transition group h-full">
-                        <div className="flex justify-between items-center mb-3">
-                          <span className="text-zinc-500 text-xs font-bold">{news.source.toUpperCase()}</span>
-                          <ImpactBadge impact={news.impact} />
-                        </div>
-                        <h4 className="text-base lg:text-lg font-bold mb-2 group-hover:text-[#00FF00] transition text-white leading-snug">
-                          {news.title}
-                        </h4>
-                        <p className="text-zinc-400 text-xs line-clamp-2">{news.summary}</p>
-                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800">
-                          <div className="flex items-center gap-1 text-zinc-500 text-[10px]">
-                            <Clock size={10} />
-                            {news.time}
+                      <div className="block bg-[#121212] border border-zinc-800 rounded-xl hover:border-zinc-500 transition group h-full overflow-hidden">
+                        {news.image && (
+                          <div className="w-full h-32 overflow-hidden">
+                            <img
+                              src={news.image}
+                              alt={news.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
                           </div>
-                          {news.relatedSymbols.length > 0 && (
-                            <div className="flex gap-1">
-                              {news.relatedSymbols.map((sym) => (
-                                <span key={sym} className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
-                                  {sym}
-                                </span>
-                              ))}
+                        )}
+                        <div className="p-5">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="text-zinc-500 text-xs font-bold">{news.source.toUpperCase()}</span>
+                            <ImpactBadge impact={news.impact} />
+                          </div>
+                          <h4 className="text-base lg:text-lg font-bold mb-2 group-hover:text-[#00FF00] transition text-white leading-snug">
+                            {news.title}
+                          </h4>
+                          <p className="text-zinc-400 text-xs line-clamp-2">{news.summary}</p>
+                          <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800">
+                            <div className="flex items-center gap-1 text-zinc-500 text-[10px]">
+                              <Clock size={10} />
+                              {news.time}
                             </div>
-                          )}
+                            {news.relatedSymbols.length > 0 && (
+                              <div className="flex gap-1">
+                                {news.relatedSymbols.map((sym) => (
+                                  <span key={sym} className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                                    {sym}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </NewsLink>
