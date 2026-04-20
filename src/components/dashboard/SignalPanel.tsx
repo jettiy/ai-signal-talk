@@ -35,9 +35,9 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
-  { id: 'NQUSD', label: '나스닥선물' },
-  { id: 'GCUSD', label: '골드선물' },
-  { id: 'CLUSD', label: 'WTI선물' },
+  { id: 'NQUSD', label: '나스닥(QQQ)' },
+  { id: 'GCUSD', label: '골드(GLD)' },
+  { id: 'CLUSD', label: 'WTI(USO)' },
 ] as const;
 
 // ── Fallback Mock (API 응답 없을 때) ──────────────────────────

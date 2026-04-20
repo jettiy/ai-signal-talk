@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Newspaper, ExternalLink, Clock, Flame, TrendingUp, Tag, Loader2, Activity, Filter } from 'lucide-react';
+import { Clock, Loader2, Activity, ExternalLink } from 'lucide-react';
 import { useNews } from '@/hooks/useNews';
 import { useFearGreed } from '@/hooks/useFearGreed';
 import type { NewsItem } from '@/lib/types';
@@ -15,38 +15,13 @@ const NEWS_CATEGORIES = [
   { id: 'crypto', label: '암호화폐', color: '#FF6B6B' },
 ];
 
-// ── 뉴스 출처 필터 ──────────────────────────────────────────────
-const NEWS_SOURCES = [
-  { id: 'all', label: '전체', icon: '📰' },
-  { id: 'reuters', label: 'Reuters', icon: '🔵' },
-  { id: 'bloomberg', label: 'Bloomberg', icon: '🟠' },
-  { id: 'cnbc', label: 'CNBC', icon: '🟣' },
-  { id: 'wsj', label: 'WSJ', icon: '⚫' },
-  { id: 'ft', label: 'FT', icon: '🟤' },
-  { id: 'nytimes', label: 'NYT', icon: '⬛' },
-  { id: 'coindesk', label: 'CoinDesk', icon: '🟡' },
-  { id: 'nikkei', label: 'Nikkei', icon: '🔴' },
-];
-
-// ── 출처 키워드 매핑 ──────────────────────────────────────────
-function matchSource(source: string): string {
-  const s = source.toLowerCase();
-  if (s.includes('reuters')) return 'reuters';
-  if (s.includes('bloomberg')) return 'bloomberg';
-  if (s.includes('cnbc')) return 'cnbc';
-  if (s.includes('wall street') || s.includes('wsj')) return 'wsj';
-  if (s.includes('financial times') || s.includes('ft.com')) return 'ft';
-  if (s.includes('new york times') || s.includes('nytimes')) return 'nytimes';
-  if (s.includes('coindesk')) return 'coindesk';
-  if (s.includes('nikkei')) return 'nikkei';
-  return '';
-}
-
-// ── 임팩트 매핑 ────────────────────────────────────────────────
-const IMPACT_MAP = {
-  high: { label: '높음', color: '#FF3B3B', bg: 'rgba(255,59,59,0.1)' },
-  medium: { label: '보통', color: '#FFD700', bg: 'rgba(255,215,0,0.1)' },
-  low: { label: '낮음', color: '#555', bg: 'rgba(85,85,85,0.1)' },
+// ── 카테고리 헤드라인 ──────────────────────────────────────────
+const CATEGORY_HEADLINES: Record<string, string> = {
+  all: '주요 뉴스 헤드라인',
+  macro: '거시경제 · 금리 · 인플레이션',
+  commodity: '원자재 · 골드 · 원유',
+  tech: '빅테크 · AI · 반도체',
+  crypto: '암호화폐 · 블록체인 · 디파이',
 };
 
 // ── 심볼 → 카테고리 자동 추론 ────────────────────────────────
@@ -60,8 +35,7 @@ function inferCategory(symbol: string): string {
 // ── 제목 → 임팩트 자동 추론 ──────────────────────────────────
 function inferImpact(title: string): 'high' | 'medium' | 'low' {
   const highKeywords = ['사상', '급락', '폭발', '긴급', '최고치', '최저치', '핵전쟁', '패닉', '크래시', '급등', '돌파'];
-  const lowerTitle = title.toLowerCase();
-  if (highKeywords.some(kw => lowerTitle.includes(kw))) return 'high';
+  if (highKeywords.some(kw => title.includes(kw))) return 'high';
   return 'medium';
 }
 
@@ -69,12 +43,10 @@ function inferImpact(title: string): 'high' | 'medium' | 'low' {
 function getRelativeTime(dateStr: string): string {
   try {
     const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = Date.now() - date.getTime();
     const diffMin = Math.floor(diffMs / 60000);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
-
     if (diffMin < 1) return '방금 전';
     if (diffMin < 60) return `${diffMin}분 전`;
     if (diffHour < 24) return `${diffHour}시간 전`;
@@ -123,7 +95,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     impact: 'high',
     summary: '미 연방준비제도가 기준금리를 동결하기로 결정했습니다. 파월 의장은 인플레이션이 2% 목표치를 향해 지속적으로 완화되는 것을 더 봐야 한다고 밝혔습니다.',
     relatedSymbols: ['NQUSD', 'GCUSD'],
-    url: '#',
+    url: 'https://www.reuters.com',
   },
   {
     id: 'fallback-2',
@@ -134,7 +106,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     impact: 'high',
     summary: '금값이 사상 최고치를 경신하며 $4,800을 돌파했습니다. 세계 중앙은행들의 꾸준한 골드 매입과 중동 지정학적 긴장이 상승을 견인하고 있습니다.',
     relatedSymbols: ['GCUSD'],
-    url: '#',
+    url: 'https://www.bloomberg.com',
   },
   {
     id: 'fallback-3',
@@ -145,7 +117,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     impact: 'medium',
     summary: '엔비디아가 다음 분기 매출 가이던스를 상향 조정했습니다. 데이터센터 AI 칩 수요가 여전히 공급을 초과하며, 블랙웰 아키텍처 출하량이 가속화되고 있습니다.',
     relatedSymbols: ['NVDA', 'NQUSD'],
-    url: '#',
+    url: 'https://www.cnbc.com',
   },
   {
     id: 'fallback-4',
@@ -156,7 +128,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     impact: 'medium',
     summary: 'OPEC+가 자발적 감산을 3개월 연장하기로 합의했습니다. 이로 인해 WTI 원유가 $65 수준을 회복했으며, 단기 공급 우려가 완화되었습니다.',
     relatedSymbols: ['CLUSD'],
-    url: '#',
+    url: 'https://www.reuters.com',
   },
   {
     id: 'fallback-5',
@@ -167,7 +139,7 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     impact: 'high',
     summary: '미국 스팟 비트코인 ETF에 일일 $2.1B 자금이 유입되며 사상 최대 기록을 세웠습니다.',
     relatedSymbols: ['BTCUSD'],
-    url: '#',
+    url: 'https://www.coindesk.com',
   },
   {
     id: 'fallback-6',
@@ -178,19 +150,55 @@ const FALLBACK_NEWS: NewsUiItem[] = [
     impact: 'low',
     summary: '애플이 아이폰 17 시리즈의 부품 주문량을 전작 대비 20% 늘렸다고 닛케이가 보도했습니다.',
     relatedSymbols: ['AAPL'],
-    url: '#',
+    url: 'https://asia.nikkei.com',
   },
 ];
 
-// ── Fear & Greed 게이지 컴포넌트 ──────────────────────────────
-function FearGreedGauge() {
-  const { data, isLoading } = useFearGreed();
+// ── 임팩트 배지 컴포넌트 ──────────────────────────────────────
+function ImpactBadge({ impact }: { impact: 'high' | 'medium' | 'low' }) {
+  if (impact === 'high') {
+    return (
+      <span className="bg-red-600/20 text-red-500 border border-red-500/30 text-[10px] px-2 py-1 rounded font-bold">
+        HIGH
+      </span>
+    );
+  }
+  if (impact === 'medium') {
+    return (
+      <span className="bg-zinc-700/50 text-zinc-300 border border-zinc-500/30 text-[10px] px-2 py-1 rounded font-bold">
+        MEDIUM
+      </span>
+    );
+  }
+  return (
+    <span className="bg-green-900/30 text-green-400 border border-green-500/30 text-[10px] px-2 py-1 rounded font-bold">
+      LOW
+    </span>
+  );
+}
 
+// ── 히어로 임팩트 배지 ──────────────────────────────────────
+function HeroImpactBadge({ impact }: { impact: 'high' | 'medium' | 'low' }) {
+  if (impact === 'high') {
+    return (
+      <span className="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded z-10">
+        CRITICAL
+      </span>
+    );
+  }
+  return (
+    <span className="absolute top-4 left-4 bg-zinc-600 text-white text-xs font-bold px-2 py-1 rounded z-10">
+      {impact === 'medium' ? 'IMPORTANT' : 'INFO'}
+    </span>
+  );
+}
+
+// ── 공포 & 탐욕 게이지 (사이드바용) ──────────────────────────
+function FearGreedCard() {
+  const { data, isLoading } = useFearGreed();
   const value = data?.value ?? 45;
   const classification = data?.valueClassification ?? 'Neutral';
-  const subs = data?.subIndicators ?? [];
 
-  // 한국어 분류 매핑
   const classLabelMap: Record<string, string> = {
     'Extreme Fear': '극도 공포',
     'Fear': '공포',
@@ -200,7 +208,6 @@ function FearGreedGauge() {
   };
   const krLabel = classLabelMap[classification] ?? classification;
 
-  // 색상 계산: 0(빨강) → 50(노랑) → 100(초록)
   function getGaugeColor(v: number): string {
     if (v <= 20) return '#FF3B3B';
     if (v <= 40) return '#FF6B35';
@@ -209,126 +216,82 @@ function FearGreedGauge() {
     return '#00FF41';
   }
 
-  function getRatingColor(rating: string): string {
-    const r = rating.toLowerCase();
-    if (r.includes('extreme fear')) return '#FF3B3B';
-    if (r.includes('fear')) return '#FF6B35';
-    if (r.includes('neutral')) return '#FFD700';
-    if (r.includes('extreme greed')) return '#00FF41';
-    if (r.includes('greed')) return '#7CFC00';
-    return '#888';
-  }
-
-  // 이전 값 비교
-  const prevClose = data?.previousClose ?? 0;
-  const prevWeek = data?.previous1Week ?? 0;
-  const prevMonth = data?.previous1Month ?? 0;
-  const diffFromClose = prevClose ? Math.round((value - prevClose) * 100) / 100 : 0;
-
   const gaugeColor = getGaugeColor(value);
 
   return (
-    <div
-      className="rounded-xl p-4 mb-4"
-      style={{ background: '#111118', border: '1px solid #1A1A1A' }}
-    >
-      <div className="flex items-center gap-2 mb-3">
-        <Activity size={12} style={{ color: gaugeColor }} />
-        <span className="text-[11px] font-bold text-white">공포 & 탐욕 지수</span>
-        <span className="text-[8px] ml-auto font-mono" style={{ color: '#444' }}>CNN</span>
-        {isLoading && <Loader2 size={10} className="animate-spin" style={{ color: '#555' }} />}
-      </div>
-
-      {/* 값 표시 */}
-      <div className="flex items-baseline gap-1.5 mb-1">
-        <span
-          className="text-3xl font-black font-mono"
-          style={{ color: gaugeColor }}
-        >
-          {Math.round(value)}
-        </span>
-        <span
-          className="text-[11px] font-bold"
-          style={{ color: gaugeColor }}
-        >
-          {krLabel}
-        </span>
-      </div>
-
-      {/* 전일 대비 */}
-      {prevClose > 0 && (
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-[9px]" style={{ color: diffFromClose >= 0 ? '#7CFC00' : '#FF6B35' }}>
-            전일대비 {diffFromClose >= 0 ? '▲' : '▼'} {Math.abs(diffFromClose).toFixed(1)}
-          </span>
-          <span className="text-[9px]" style={{ color: '#444' }}>
-            1주전 {Math.round(prevWeek)} · 1개월전 {Math.round(prevMonth)}
-          </span>
+    <div className="bg-[#121212] border border-zinc-800 rounded-xl p-5">
+      <h3 className="text-sm font-bold border-l-4 border-zinc-500 pl-2 mb-4">시장 심리 지표</h3>
+      {isLoading ? (
+        <div className="flex items-center justify-center h-20">
+          <Loader2 size={20} className="animate-spin text-zinc-600" />
         </div>
-      )}
-
-      {/* 가로 막대 게이지 */}
-      <div className="relative w-full h-2 rounded-full overflow-hidden" style={{ background: '#1A1A1A' }}>
-        {/* 그라데이션 배경 */}
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: 'linear-gradient(to right, #FF3B3B, #FF6B35, #FFD700, #7CFC00, #00FF41)',
-            opacity: 0.25,
-          }}
-        />
-        {/* 채워진 영역 */}
-        <div
-          className="absolute top-0 left-0 h-full rounded-full transition-all duration-700"
-          style={{
-            width: `${value}%`,
-            background: gaugeColor,
-            boxShadow: `0 0 8px ${gaugeColor}40`,
-          }}
-        />
-        {/* 현재 값 표시기 */}
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full border-2 transition-all duration-700"
-          style={{
-            left: `calc(${value}% - 5px)`,
-            background: '#fff',
-            borderColor: gaugeColor,
-            boxShadow: `0 0 6px ${gaugeColor}80`,
-          }}
-        />
-      </div>
-
-      {/* 라벨 */}
-      <div className="flex justify-between mt-1.5">
-        <span className="text-[8px] font-mono" style={{ color: '#FF3B3B' }}>극도공포</span>
-        <span className="text-[8px] font-mono" style={{ color: '#FFD700' }}>중립</span>
-        <span className="text-[8px] font-mono" style={{ color: '#00FF41' }}>극도탐욕</span>
-      </div>
-
-      {/* 서브 지표 */}
-      {subs.length > 0 && (
-        <div className="mt-3 pt-3" style={{ borderTop: '1px solid #1A1A1A' }}>
-          <div className="grid grid-cols-2 gap-1.5">
-            {subs.map((sub) => {
-              const subColor = getRatingColor(sub.rating);
-              return (
-                <div key={sub.key} className="flex items-center justify-between py-1">
-                  <span className="text-[9px]" style={{ color: '#666' }}>{sub.label}</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] font-bold font-mono" style={{ color: subColor }}>
-                      {Math.round(sub.score)}
-                    </span>
-                    <span
-                      className="w-1.5 h-1.5 rounded-full"
-                      style={{ background: subColor }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+      ) : (
+        <>
+          <div className="flex justify-between items-end mb-2">
+            <span className="text-sm font-semibold text-zinc-300">공포 & 탐욕 지수</span>
+            <span className="text-3xl font-bold font-mono" style={{ color: gaugeColor }}>
+              {Math.round(value)}
+            </span>
           </div>
-        </div>
+          <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden mb-2">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${value}%`,
+                background: gaugeColor,
+                boxShadow: `0 0 8px ${gaugeColor}40`,
+              }}
+            />
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-zinc-500">극도의 공포</span>
+            <span className="text-[10px] font-semibold" style={{ color: gaugeColor }}>{krLabel}</span>
+            <span className="text-[10px] text-zinc-500">탐욕</span>
+          </div>
+        </>
       )}
+    </div>
+  );
+}
+
+// ── 경제 지표 카드 ──────────────────────────────────────────
+function EconomicIndicatorsCard() {
+  const indicators = [
+    { name: '소비자물가지수 (전년)', sub: '소비자 물가 지수', actual: '3.4%', forecast: '3.2%', type: 'bad' as const },
+    { name: '비농업 고용 지표', sub: '고용 변화', actual: '175K', forecast: '243K', type: 'good' as const },
+    { name: '실업률', sub: '노동 시장', actual: '3.9%', forecast: '3.8%', type: 'neutral' as const },
+  ];
+
+  const actualColor = (type: 'good' | 'bad' | 'neutral') => {
+    if (type === 'good') return 'text-[#00FF00]';
+    if (type === 'bad') return 'text-red-500';
+    return 'text-zinc-200';
+  };
+
+  return (
+    <div className="bg-[#121212] border border-zinc-800 rounded-xl p-5">
+      <h3 className="text-sm font-bold border-l-4 border-[#00FF00] pl-2 mb-4">미국 경제 지표</h3>
+      <div className="flex justify-between text-[10px] text-zinc-500 border-b border-zinc-800 pb-2 mb-3">
+        <span>지표</span>
+        <div className="flex space-x-6">
+          <span className="w-8 text-right">실제</span>
+          <span className="w-8 text-right">예측</span>
+        </div>
+      </div>
+      <div className="space-y-4 text-sm">
+        {indicators.map((ind) => (
+          <div key={ind.name} className="flex justify-between items-center">
+            <div>
+              <div className="font-semibold text-zinc-200">{ind.name}</div>
+              <div className="text-[10px] text-zinc-500">{ind.sub}</div>
+            </div>
+            <div className="flex space-x-6">
+              <span className={`w-8 text-right ${actualColor(ind.type)}`}>{ind.actual}</span>
+              <span className="w-8 text-right text-zinc-400">{ind.forecast}</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -336,255 +299,194 @@ function FearGreedGauge() {
 // ── 메인 컴포넌트 ──────────────────────────────────────────────
 export default function NewsPanel() {
   const [activeCategory, setActiveCategory] = useState('all');
-  const [activeSource, setActiveSource] = useState('all');
 
-  // 실데이터 조회 (카테고리 필터 적용)
   const { data: apiNews, isLoading } = useNews(
     activeCategory !== 'all'
       ? { category: activeCategory as 'macro' | 'commodity' | 'tech' | 'crypto' }
       : undefined
   );
 
-  // 뉴스 아이템 결정 (실데이터 우선, 없으면 fallback)
   const newsItems: NewsUiItem[] =
     apiNews && apiNews.length > 0
       ? apiNews.map((item, i) => transformNewsItem(item, i))
       : FALLBACK_NEWS;
 
-  // 카테고리 + 출처 필터링
-  const filteredNews = newsItems.filter((n) => {
-    const catMatch = activeCategory === 'all' || n.category === activeCategory;
-    const srcMatch = activeSource === 'all' || matchSource(n.source) === activeSource;
-    return catMatch && srcMatch;
-  });
+  const filteredNews = newsItems.filter((n) =>
+    activeCategory === 'all' || n.category === activeCategory
+  );
+
+  const heroNews = filteredNews[0];
+  const subNews = filteredNews.slice(1);
+  const headline = CATEGORY_HEADLINES[activeCategory] || CATEGORY_HEADLINES.all;
 
   return (
-    <div className="flex h-full" style={{ background: '#0A0A0F' }}>
-      {/* 메인 뉴스 피드 */}
-      <div className="flex flex-col flex-1 min-w-0">
-        {/* 헤더 */}
-        <div
-          className="flex items-center gap-3 px-5 py-3 shrink-0"
-          style={{ borderBottom: '1px solid #1A1A1A' }}
-        >
-          <Newspaper size={14} style={{ color: '#00FF41' }} />
-          <span className="text-xs font-bold text-white">뉴스룸</span>
+    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8" style={{ background: '#09090b' }}>
+      {/* 스크롤바 스타일 */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
+      `}</style>
 
-          {/* 카테고리 필터 */}
-          <div className="flex gap-1.5 ml-3">
-            {NEWS_CATEGORIES.map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => setActiveCategory(cat.id)}
-                className="text-[9px] font-bold px-2 py-1 rounded-lg cursor-pointer transition-all"
-                style={{
-                  background: activeCategory === cat.id ? `${cat.color}15` : '#111118',
-                  color: activeCategory === cat.id ? cat.color : '#555',
-                  border: `1px solid ${activeCategory === cat.id ? `${cat.color}30` : '#1A1A1A'}`,
-                }}
-              >
-                {cat.label}
-              </button>
-            ))}
+      {/* ── 타이틀 섹션 ────────────────────────────── */}
+      <div className="mb-6">
+        <div className="inline-block px-3 py-1 rounded-full bg-zinc-800/50 border border-[#00FF00]/30 text-[#00FF00] text-xs font-semibold mb-3">
+          ● 실시간 인텔리전스 피드
+        </div>
+        <h1 className="text-3xl lg:text-4xl font-bold mb-2 text-white">글로벌 뉴스 센터</h1>
+        <p className="text-zinc-400 text-sm">전 세계 주요 경제 및 지정학적 뉴스를 실시간으로 전해드립니다.</p>
+      </div>
+
+      {/* ── 카테고리 탭바 ──────────────────────────── */}
+      <div className="flex items-center gap-2 mb-6">
+        {NEWS_CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveCategory(cat.id)}
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-all"
+            style={{
+              background: activeCategory === cat.id ? `${cat.color}15` : 'transparent',
+              color: activeCategory === cat.id ? cat.color : '#71717a',
+              border: `1px solid ${activeCategory === cat.id ? `${cat.color}30` : 'transparent'}`,
+            }}
+          >
+            {cat.label}
+          </button>
+        ))}
+        {isLoading && <Loader2 size={14} className="animate-spin ml-auto" style={{ color: '#00FF41' }} />}
+      </div>
+
+      {/* ── 메인 레이아웃: 뉴스 + 사이드바 ──────────── */}
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* 좌측: 뉴스 영역 */}
+        <div className="flex-1 flex flex-col space-y-6 min-w-0">
+          {/* 헤드라인 바 */}
+          <div className="flex justify-between items-end border-b border-zinc-800 pb-2">
+            <h2 className="text-lg font-bold border-l-4 border-red-500 pl-2 text-white">{headline}</h2>
+            <span className="text-xs text-zinc-500">
+              {filteredNews.length > 0 && filteredNews[0].time} 업데이트됨
+            </span>
           </div>
 
-          {/* 로딩 인디케이터 */}
-          {isLoading && (
-            <Loader2 size={12} className="animate-spin ml-auto" style={{ color: '#00FF41' }} />
-          )}
-        </div>
-
-        {/* 출처 필터바 */}
-        <div
-          className="flex items-center gap-2 px-5 py-2 shrink-0 overflow-x-auto"
-          style={{ borderBottom: '1px solid #1A1A1A', background: '#0D0D14' }}
-        >
-          <Filter size={10} style={{ color: '#555' }} />
-          {NEWS_SOURCES.map((src) => (
-            <button
-              key={src.id}
-              onClick={() => setActiveSource(src.id)}
-              className="text-[9px] font-semibold px-2 py-0.5 rounded-md cursor-pointer transition-all whitespace-nowrap flex items-center gap-1"
-              style={{
-                background: activeSource === src.id ? '#1A1A2A' : 'transparent',
-                color: activeSource === src.id ? '#fff' : '#555',
-                border: `1px solid ${activeSource === src.id ? '#333' : 'transparent'}`,
-              }}
-            >
-              <span>{src.icon}</span>
-              {src.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 뉴스 리스트 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {/* 로딩 */}
           {isLoading && filteredNews.length === 0 ? (
-            <div className="flex items-center justify-center h-40">
-              <div className="flex items-center gap-2" style={{ color: '#555' }}>
-                <Loader2 size={16} className="animate-spin" />
-                <span className="text-xs">뉴스 로딩중...</span>
+            <div className="flex items-center justify-center h-60">
+              <div className="flex items-center gap-2 text-zinc-500">
+                <Loader2 size={20} className="animate-spin" />
+                <span className="text-sm">뉴스 로딩중...</span>
               </div>
             </div>
           ) : filteredNews.length === 0 ? (
-            <div className="flex items-center justify-center h-40">
-              <div className="text-center" style={{ color: '#555' }}>
-                <Filter size={24} className="mx-auto mb-2 opacity-30" />
-                <p className="text-xs">해당 출처의 뉴스가 없습니다</p>
+            <div className="flex items-center justify-center h-60">
+              <div className="text-center text-zinc-500">
+                <p className="text-sm">해당 카테고리의 뉴스가 없습니다</p>
                 <button
-                  onClick={() => setActiveSource('all')}
-                  className="text-[10px] mt-2 px-2 py-1 rounded"
-                  style={{ color: '#00FF41', border: '1px solid #00FF4130' }}
+                  onClick={() => setActiveCategory('all')}
+                  className="text-xs mt-2 px-3 py-1 rounded text-[#00FF00] border border-[#00FF00]/30 hover:bg-[#00FF00]/10 transition cursor-pointer"
                 >
                   전체 보기
                 </button>
               </div>
             </div>
           ) : (
-            filteredNews.map((news) => {
-              const impactInfo = IMPACT_MAP[news.impact];
-              const catInfo = NEWS_CATEGORIES.find((c) => c.id === news.category);
-
-              return (
-                <article
-                  key={news.id}
-                  className="rounded-xl p-4 transition-all cursor-pointer group"
-                  style={{ background: '#111118', border: '1px solid #1A1A1A' }}
-                  onClick={() => {
-                    if (news.url && news.url !== '#') {
-                      window.open(news.url, '_blank', 'noopener,noreferrer');
-                    }
-                  }}
-                >
-                  {/* 상단: 임팩트 + 카테고리 + 시간 */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"
-                      style={{ background: impactInfo.bg, color: impactInfo.color }}
-                    >
-                      <Flame size={8} />
-                      임팩트 {impactInfo.label}
-                    </span>
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded"
-                      style={{ background: `${catInfo?.color}10`, color: catInfo?.color }}
-                    >
-                      {catInfo?.label}
-                    </span>
-                    <span className="text-[9px] ml-auto flex items-center gap-1" style={{ color: '#444' }}>
-                      <Clock size={8} />
-                      {news.time}
-                    </span>
-                  </div>
-
-                  {/* 제목 */}
-                  <h3 className="text-sm font-bold text-white mb-2 group-hover:text-green-400 transition-colors leading-snug">
-                    {news.url && news.url !== '#' ? (
-                      <a href={news.url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                        {news.title}
-                      </a>
-                    ) : (
-                      news.title
-                    )}
-                  </h3>
-
-                  {/* 요약 */}
-                  <p className="text-[11px] leading-relaxed mb-3" style={{ color: '#888' }}>
-                    {news.summary}
-                  </p>
-
-                  {/* 하단: 관련 심볼 + 소스 */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Tag size={9} style={{ color: '#444' }} />
-                      {news.relatedSymbols.map((sym) => (
-                        <span
-                          key={sym}
-                          className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded"
-                          style={{ background: '#0A0A0F', color: '#00FF41' }}
-                        >
-                          {sym}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-semibold" style={{ color: '#666' }}>{news.source}</span>
-                      {news.url && news.url !== '#' && (
-                        <ExternalLink size={9} style={{ color: '#333' }} />
-                      )}
+            <>
+              {/* ── 히어로 뉴스 카드 ──────────────────── */}
+              {heroNews && (
+                <NewsLink url={heroNews.url}>
+                  <div className="block bg-[#121212] border border-zinc-800 rounded-xl overflow-hidden hover:border-zinc-500 transition cursor-pointer group">
+                    <div className="flex flex-col md:flex-row">
+                      {/* 이미지/플레이스홀더 */}
+                      <div className="w-full md:w-2/5 bg-zinc-800 relative h-48 md:h-auto min-h-[200px]">
+                        <div className="absolute inset-0 bg-gradient-to-b from-zinc-700 to-zinc-900" />
+                        <HeroImpactBadge impact={heroNews.impact} />
+                        <div className="absolute bottom-3 right-3">
+                          <ExternalLink size={14} className="text-zinc-500" />
+                        </div>
+                      </div>
+                      {/* 콘텐츠 */}
+                      <div className="w-full md:w-3/5 p-6 flex flex-col justify-center">
+                        <div className="flex items-center space-x-2 text-xs font-bold mb-2">
+                          <span className="text-red-500">{heroNews.source.toUpperCase()}</span>
+                          <span className="text-zinc-500">{heroNews.time}</span>
+                        </div>
+                        <h3 className="text-xl lg:text-2xl font-bold mb-3 group-hover:text-[#00FF00] transition text-white leading-tight">
+                          {heroNews.title}
+                        </h3>
+                        <p className="text-zinc-400 text-sm mb-4 line-clamp-3">{heroNews.summary}</p>
+                        {heroNews.relatedSymbols.length > 0 && (
+                          <div className="flex items-center space-x-2 mt-auto">
+                            <span className="text-xs text-zinc-500">자산 영향:</span>
+                            {heroNews.relatedSymbols.map((sym) => (
+                              <span
+                                key={sym}
+                                className="bg-green-900/30 text-[#00FF00] border border-[#00FF00]/30 text-xs px-2 py-1 rounded"
+                              >
+                                {sym}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </article>
-              );
-            })
+                </NewsLink>
+              )}
+
+              {/* ── 서브 뉴스 그리드 ──────────────────── */}
+              {subNews.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {subNews.map((news) => (
+                    <NewsLink key={news.id} url={news.url}>
+                      <div className="block bg-[#121212] border border-zinc-800 p-5 rounded-xl hover:border-zinc-500 transition group h-full">
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="text-zinc-500 text-xs font-bold">{news.source.toUpperCase()}</span>
+                          <ImpactBadge impact={news.impact} />
+                        </div>
+                        <h4 className="text-base lg:text-lg font-bold mb-2 group-hover:text-[#00FF00] transition text-white leading-snug">
+                          {news.title}
+                        </h4>
+                        <p className="text-zinc-400 text-xs line-clamp-2">{news.summary}</p>
+                        <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800">
+                          <div className="flex items-center gap-1 text-zinc-500 text-[10px]">
+                            <Clock size={10} />
+                            {news.time}
+                          </div>
+                          {news.relatedSymbols.length > 0 && (
+                            <div className="flex gap-1">
+                              {news.relatedSymbols.map((sym) => (
+                                <span key={sym} className="text-[10px] font-mono text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                                  {sym}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </NewsLink>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
-      </div>
 
-      {/* 오른쪽: Fear & Greed + 트렌딩 + 캘린더 */}
-      <div
-        className="w-72 shrink-0 flex flex-col p-4 overflow-y-auto"
-        style={{ background: '#0A0A0F', borderLeft: '1px solid #1A1A1A' }}
-      >
-        {/* 공포 & 탐욕 지수 게이지 */}
-        <FearGreedGauge />
-
-        {/* 트렌딩 토픽 */}
-        <div className="mb-5">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={12} style={{ color: '#00FF41' }} />
-            <span className="text-[11px] font-bold text-white">트렌딩 토픽</span>
-          </div>
-          {[
-            { tag: '#FOMC', count: 342, color: '#FF3B3B' },
-            { tag: '#골드사상최고', count: 218, color: '#FFD700' },
-            { tag: '#NVDA실적', count: 187, color: '#A855F7' },
-            { tag: '#OPEC감산', count: 156, color: '#00B4D8' },
-            { tag: '#BTC기관유입', count: 134, color: '#FF6B6B' },
-          ].map((topic) => (
-            <div
-              key={topic.tag}
-              className="flex items-center gap-2 py-2 px-2.5 rounded-lg mb-1 cursor-pointer hover:bg-white/5 transition-colors"
-            >
-              <span className="text-[11px] font-bold" style={{ color: topic.color }}>{topic.tag}</span>
-              <span className="text-[9px] ml-auto font-mono" style={{ color: '#444' }}>{topic.count} 언급</span>
-            </div>
-          ))}
-        </div>
-
-        {/* 경제 캘린더 */}
-        <div>
-          <div className="flex items-center gap-2 mb-3">
-            <Clock size={12} style={{ color: '#FFD700' }} />
-            <span className="text-[11px] font-bold text-white">오늘의 일정</span>
-          </div>
-          {[
-            { time: '10:00', event: '한국 수출입', impact: 'medium' as const },
-            { time: '17:30', event: '유럽 CPI', impact: 'high' as const },
-            { time: '18:00', event: 'FOMC 의사록', impact: 'high' as const },
-            { time: '22:30', event: '미국 실업수당청구', impact: 'medium' as const },
-            { time: '23:00', event: '미국 PMI', impact: 'high' as const },
-          ].map((item) => {
-            const imp = IMPACT_MAP[item.impact];
-            return (
-              <div
-                key={item.time + item.event}
-                className="rounded-lg p-2.5 mb-2"
-                style={{ background: '#111118', border: '1px solid #1A1A1A' }}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-bold font-mono" style={{ color: '#555' }}>{item.time} KST</span>
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: imp.color }}
-                  />
-                </div>
-                <div className="text-[11px] font-semibold text-white mt-0.5">{item.event}</div>
-              </div>
-            );
-          })}
+        {/* ── 우측 사이드바 ────────────────────────── */}
+        <div className="w-full lg:w-80 flex flex-col space-y-6 shrink-0">
+          <EconomicIndicatorsCard />
+          <FearGreedCard />
         </div>
       </div>
     </div>
   );
+}
+
+// ── 뉴스 링크 래퍼 (url 있으면 <a>, 없으면 <div>) ────────────
+function NewsLink({ url, children }: { url: string; children: React.ReactNode }) {
+  if (url && url !== '#' && url !== '') {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="block no-underline">
+        {children}
+      </a>
+    );
+  }
+  return <div>{children}</div>;
 }
