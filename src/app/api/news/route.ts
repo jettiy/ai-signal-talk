@@ -39,40 +39,33 @@ function ensureUrl(item: NewsItem, webResults: WebSearchResult[]): NewsItem {
 
 // ═══════════════════════════════════════════════════════════
 //  시장 영향 키워드 필터 (Breaking News용)
-//  금리, Fed, GDP, 인플레이션, 실업, 지정학 등 시장 변동성 유발
 // ═══════════════════════════════════════════════════════════
 const BREAKING_KEYWORDS = [
-  // 금리/중앙은행
   'fed', 'fomc', 'rate cut', 'rate hike', 'interest rate', 'federal reserve',
   'ecb', 'boj', 'bank of japan', 'powell', 'yellen',
   '기준금리', '금리', '연준', '인하', '동결',
-  // GDP/경제지표
   'gdp', 'cpi', 'ppi', 'inflation', 'deflation', 'recession',
   'unemployment', 'jobs', 'nonfarm', 'employment', 'retail sales',
   '경제성장률', '물가지수', '고용', '실업률',
-  // 지정학/위험
   'war', 'conflict', 'sanction', 'tariff', 'trade war', 'nuclear',
   'israel', 'iran', 'russia', 'ukraine', 'china', 'north korea',
   '지정학', '전쟁', '제재', '관세', '무역',
-  // 시장 쇼크
   'crash', 'surge', 'rally', 'plunge', 'record high', 'record low',
   'halt', 'circuit breaker', 'flash crash',
   '급락', '급등', '폭락', '돌파', '사상최고', '최저',
-  // 원자재
   'opec', 'oil price', 'gold price', 'gold hit', 'crude',
   '산유', '원유', '골드', '금값',
-  // 빅테크/AI
   'nvidia', 'apple', 'tesla', 'microsoft', 'google', 'meta',
   'ai chip', 'semiconductor', 'tech layoff',
   '엔비디아', '테슬라', '반도체',
-  // 암호화폐
   'bitcoin', 'ethereum', 'crypto', 'sec', 'etf approval',
   '비트코인', '암호화폐',
 ];
 
+const CRITICAL_KW = ['fed', 'fomc', 'rate cut', 'rate hike', 'circuit breaker', 'crash', '비트코인'];
+
 function isMarketMoving(title: string, text: string): boolean {
   const content = `${title} ${text}`.toLowerCase();
-  // 키워드 2개 이상 매칭 → 높은 확률로 시장 영향 뉴스
   let matchCount = 0;
   for (const kw of BREAKING_KEYWORDS) {
     if (content.includes(kw)) {
@@ -80,15 +73,12 @@ function isMarketMoving(title: string, text: string): boolean {
       if (matchCount >= 2) return true;
     }
   }
-  // 단일 키워드라도 핵심 키워드면 통과
-  const criticalKw = ['fed', 'fomc', 'rate cut', 'rate hike', 'circuit breaker', 'crash', '비트코인'];
-  for (const kw of criticalKw) {
+  for (const kw of CRITICAL_KW) {
     if (content.includes(kw)) return true;
   }
   return false;
 }
 
-/** 임팩트 점수 계산 */
 function calcImpact(title: string, text: string): number {
   const content = `${title} ${text}`.toLowerCase();
   let score = 0;
@@ -102,7 +92,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const symbol = searchParams.get('symbol') || '';
   const category = searchParams.get('category') || '';
-  const mode = searchParams.get('mode') || 'column'; // 'breaking' | 'column'
+  const mode = searchParams.get('mode') || 'column';
 
   // ── 1. FMP 뉴스 ──────────────────────────────────────
   let fmpNews: NewsItem[] = [];
@@ -110,22 +100,31 @@ export async function GET(req: NextRequest) {
     fmpNews = await getNews(symbol);
   } catch {}
 
-  // ── 2. 웹검색 보강 (breaking 모드에서는 생략 → FMP만 사용) ──
+  // ── 2. 웹검색 보강 (모든 모드에서 사용) ──────────────
   let webResults: WebSearchResult[] = [];
-  if (mode !== 'breaking') {
-    try {
-      if (category) {
-        webResults = await searchMarketNews(category as 'macro' | 'commodity' | 'tech' | 'crypto');
-      } else if (symbol) {
-        const label = searchParams.get('label') || symbol;
-        webResults = await searchFinancialNews(symbol, label);
-      } else {
-        const now = new Date();
-        const dateStr = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
-        webResults = await webSearch(`글로벌 경제 시장 뉴스 ${dateStr} Fed 금리 원유 골드 나스닥 최신`, 10);
-      }
-    } catch {}
-  }
+  try {
+    if (mode === 'breaking') {
+      // Breaking: 시장 영향 뉴스 키워드로 검색
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      webResults = await webSearch(
+        `breaking news market Fed interest rate gold oil Nasdaq ${dateStr}`,
+        15
+      );
+    } else if (category) {
+      webResults = await searchMarketNews(category as 'macro' | 'commodity' | 'tech' | 'crypto');
+    } else if (symbol) {
+      const label = searchParams.get('label') || symbol;
+      webResults = await searchFinancialNews(symbol, label);
+    } else {
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      webResults = await webSearch(
+        `global market news ${dateStr} Fed interest rate oil gold Nasdaq latest`,
+        15
+      );
+    }
+  } catch {}
 
   const webNewsItems: NewsItem[] = webResults.map((r) => ({
     symbol: symbol || 'MARKET',
@@ -152,8 +151,8 @@ export async function GET(req: NextRequest) {
   if (mode === 'breaking') {
     const scored = uniqueNews
       .map(n => ({ ...n, _impactScore: calcImpact(n.title, n.text || '') }))
-      .filter(n => n._impactScore >= 2 || isMarketMoving(n.title, n.text || ''))
-      .sort((a, b) => b._impactScore - a._impactScore);
+      .filter(n => (n as any)._impactScore >= 2 || isMarketMoving(n.title, n.text || ''))
+      .sort((a, b) => (b as any)._impactScore - (a as any)._impactScore);
     filteredNews = scored.slice(0, 15);
   }
 

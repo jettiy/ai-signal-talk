@@ -300,8 +300,22 @@ export default function CommunityPanel() {
   // ── AI 시그널 결과 (버튼 클릭 시 저장) ──
   const [signalResult, setSignalResult] = useState<{ entryPrice?: number; targetPrice?: number; stopLoss?: number; confidence?: number; signalType?: string } | null>(null);
 
-  // ── 실시간 뉴스 (FMP Breaking + 한국어 번역) ──
+  // ── 실시간 뉴스 (FMP Breaking + 한국어 번역) — 5분 간신 ──
   const { data: newsData, isLoading: newsLoading } = useNews({ mode: 'breaking' });
+
+  // 누적 뉴스: 새 응답이 오면 기존에 없는 것만 앞에 추가 (최대 50개)
+  const [accumulatedNews, setAccumulatedNews] = useState<any[]>([]);
+  const prevTitlesRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (newsData && newsData.length > 0) {
+      const newItems = newsData.filter((n: any) => !prevTitlesRef.current.has(n.title?.slice(0, 50)));
+      if (newItems.length > 0) {
+        newItems.forEach((n: any) => prevTitlesRef.current.add(n.title?.slice(0, 50)));
+        setAccumulatedNews(prev => [...newItems, ...prev].slice(0, 50));
+      }
+    }
+  }, [newsData]);
 
   // ── 실시간 시세 데이터 ──
   const { data: allQuotes } = useMarketData();
@@ -550,7 +564,7 @@ export default function CommunityPanel() {
               <Loader2 size={14} className="animate-spin" style={{ color: '#333' }} />
             </div>
           )}
-          {(newsData && newsData.length > 0 ? newsData : MOCK_NEWS).map((news: any, idx: number) => {
+          {(accumulatedNews.length > 0 ? accumulatedNews : newsLoading ? [] : MOCK_NEWS).map((news: any, idx: number) => {
             const impactInfo = (IMPACT_MAP as Record<string, typeof IMPACT_MAP.medium>)[news.impact as string] || IMPACT_MAP.medium;
             const newsUrl = news.url && news.url !== '#' ? news.url : '';
             const newsTime = formatRelativeTime(news.publishedDate || news.time || new Date().toISOString());
