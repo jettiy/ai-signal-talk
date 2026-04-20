@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 백엔드가 OAuth2 폼 형식(username + password)을 기대
+    // 백엔드 v2: OAuth2 token endpoint (form-urlencoded)
     const formData = new URLSearchParams();
     formData.append('username', email);
     formData.append('password', password);

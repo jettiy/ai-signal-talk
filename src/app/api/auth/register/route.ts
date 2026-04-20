@@ -29,11 +29,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 백엔드가 nickname 필드를 기대
-    const res = await fetch(`${BACKEND_URL}/api/v2/users/register`, {
+    // 백엔드 v2: query parameter 방식
+    const params = new URLSearchParams({
+      email,
+      password,
+      nickname: nickname || '',
+    });
+
+    const res = await fetch(`${BACKEND_URL}/api/v2/users/register?${params.toString()}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, nickname }),
     });
 
     const data = await res.json();
