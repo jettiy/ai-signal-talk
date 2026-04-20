@@ -99,7 +99,11 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       }
       case 'web_search': {
         const query = String(args.query || '');
-        const results = await webSearch(query, 5);
+        // 최신 뉴스를 위해 오늘 날짜를 쿼리에 추가
+        const now = new Date();
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const timeQuery = query.includes(String(now.getFullYear())) ? query : `${query} ${dateStr}`;
+        const results = await webSearch(timeQuery, 8);
         return JSON.stringify(
           results.map((r) => ({
             title: r.title,
@@ -141,6 +145,7 @@ export async function chatWithAgent(
 규칙:
 - 시세나 뉴스 질문이 오면 반드시 도구를 호출해서 실시간 데이터를 확인해
 - 추측으로 답변하지 말고, 항상 실제 데이터를 기반으로 답해
+- 뉴스 검색 시 반드시 web_search 도구를 호출해. 뉴스룸에 있는 캐시된 뉴스가 아니라 웹에서 실시간 검색해야 해.
 - 한국어로 자연스럽게 대화해
 - 전문적이면서도 이해하기 쉽게 설명해`,
   };
