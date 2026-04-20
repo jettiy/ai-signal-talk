@@ -5,20 +5,21 @@ import { Calendar, Clock, AlertTriangle } from 'lucide-react';
 // ── 오늘 발표 일정 ────────────────────────────────────────────
 // actual > forecast → 초록, actual < forecast → 빨강, 전월치 → 흰색
 const TODAY_EVENTS = [
-  { time: '22:30', event: '실업수당청구', actual: 220, forecast: 228, previous: 215, unit: 'K' },
-  { time: '22:30', event: '필라델피아 Fed', actual: -2.5, forecast: 12.5, previous: 12.5, unit: '' },
-  { time: '23:00', event: 'ISM 제조업 PMI', actual: 49.8, forecast: 50.3, previous: 50.3, unit: '' },
-  { time: '23:00', event: 'JOLTS 채용공고', actual: 8.76, forecast: 8.80, previous: 8.76, unit: 'M' },
-  { time: '01:00', event: 'FOMC 의사록', actual: null, forecast: null, previous: null, unit: '' },
+  { time: '22:30', event: '소매매출', actual: null, forecast: 0.3, previous: 0.2, unit: '%' },
+  { time: '23:15', event: '산업생산', actual: null, forecast: 0.1, previous: 0.1, unit: '%' },
 ];
 
 // ── 이번주 주요 일정 ──────────────────────────────────────────
 const WEEK_EVENTS = [
-  { day: '월', event: '소매매출', actual: null, forecast: 0.3, previous: 0.2, unit: '%', isUp: true },
-  { day: '화', event: '산업생산', actual: 0.2, forecast: 0.1, previous: 0.1, unit: '%', isUp: true },
-  { day: '수', event: '주택착공', actual: 1.36, forecast: 1.38, previous: 1.36, unit: 'M', isUp: false },
-  { day: '목', event: '실업수당청구', actual: null, forecast: 220, previous: 228, unit: 'K', isUp: false },
-  { day: '금', event: '비농업고용지표', actual: null, forecast: 165, previous: 151, unit: 'K', isUp: true },
+  { day: '화', event: '소매매출', actual: null, forecast: 0.3, previous: 0.2, unit: '%' },
+  { day: '화', event: '산업생산', actual: null, forecast: 0.1, previous: 0.1, unit: '%' },
+  { day: '수', event: '신규주택판매', actual: null, forecast: 680, previous: 660, unit: 'K' },
+  { day: '수', event: 'FOMC 베이지북', actual: null, forecast: null, previous: null, unit: '' },
+  { day: '목', event: '실업수당청구', actual: null, forecast: 220, previous: 220, unit: 'K' },
+  { day: '목', event: '내구재주문', actual: null, forecast: 0.3, previous: 0.2, unit: '%' },
+  { day: '목', event: 'GDP 속보 Q1', actual: null, forecast: 2.5, previous: 3.0, unit: '%' },
+  { day: '금', event: 'PCE 물가지수', actual: null, forecast: 0.2, previous: 0.2, unit: '%' },
+  { day: '금', event: '미시간대소비자심리', actual: null, forecast: 77.0, previous: 77.0, unit: '' },
 ];
 
 function formatValue(val: number | null, unit: string) {

@@ -6,16 +6,6 @@ import { Quote, NewsItem, CandleData, FearGreedIndex } from './types';
 
 const FMP_API_KEY = process.env.FMP_API_KEY || '';
 const FMP_BASE = 'https://financialmodelingprep.com/stable';
-
-// 구독 가능한 심볼 목록 (선물 3종 + 주요 주식/ETF)
-const AVAILABLE_SYMBOLS = [
-  'NQUSD',   // 나스닥선물
-  'GCUSD',   // 골드선물
-  'CLUSD',   // WTI원유선물
-  'AAPL', 'NVDA', 'TSLA', 'META', 'MSFT', 'AMZN',
-  'SPY', 'QQQ',
-];
-
 // 실시간 시세 조회 (개별 심볼 병렬 호출)
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   if (!FMP_API_KEY) {
@@ -24,7 +14,7 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   }
 
   try {
-    const validSymbols = symbols.filter(s => AVAILABLE_SYMBOLS.includes(s));
+    const validSymbols = symbols;
     const results = await Promise.all(
       validSymbols.map(async (symbol) => {
         const res = await fetch(
@@ -59,17 +49,7 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
       })
     );
     // null 제거
-    const validResults = results.filter((r): r is Quote => r !== null);
-    
-    // FMP에서 누락된 심볼은 mock으로 보완
-    const returnedSymbols = new Set(validResults.map(r => r.symbol));
-    const missingSymbols = validSymbols.filter(s => !returnedSymbols.has(s));
-    if (missingSymbols.length > 0) {
-      const mockFill = getMockQuotes(missingSymbols);
-      return [...validResults, ...mockFill];
-    }
-    
-    return validResults;
+    return results.filter((r): r is Quote => r !== null);
   } catch (error) {
     console.error('FMP getQuotes error:', error);
     return getMockQuotes(symbols);
@@ -108,6 +88,26 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
   }
 }
 
+// 단일 심볼 quote 조회 (차트 최신화용)
+async function getQuoteSingle(symbol: string): Promise<{ price: number; timestamp: number; open: number; dayHigh: number; dayLow: number; volume: number } | null> {
+  if (!FMP_API_KEY) return null;
+  try {
+    const res = await fetch(`${FMP_BASE}/quote?symbol=${symbol}&apikey=${FMP_API_KEY}`, { cache: 'no-store' } as RequestInit);
+    if (!res.ok || !res.ok) return null;
+    const data = await res.json();
+    if (!data || data.length === 0) return null;
+    const raw = data[0];
+    return {
+      price: raw.price ?? 0,
+      timestamp: Date.now(),
+      open: raw.open ?? 0,
+      dayHigh: raw.dayHigh ?? 0,
+      dayLow: raw.dayLow ?? 0,
+      volume: raw.volume ?? 0,
+    };
+  } catch { return null; }
+}
+
 // 차트 데이터 (Candlestick)
 export async function getHistoricalChart(
   symbol: string,
@@ -129,17 +129,22 @@ export async function getHistoricalChart(
   const period = periodMap[timeframe] || '30min';
 
   try {
-    const res = await fetch(
-      `${FMP_BASE}/historical-chart/${period}?symbol=${symbol}&apikey=${FMP_API_KEY}`,
-      { cache: 'no-store' } as RequestInit
-    );
+    const [chartRes, quoteRes] = await Promise.all([
+      fetch(
+        `${FMP_BASE}/historical-chart/${period}?symbol=${symbol}&apikey=${FMP_API_KEY}`,
+        { cache: 'no-store' } as RequestInit
+      ),
+      fetch(
+        `${FMP_BASE}/quote?symbol=${symbol}&apikey=${FMP_API_KEY}`,
+        { cache: 'no-store' } as RequestInit
+      ),
+    ]);
 
-    if (!res.ok) throw new Error(`FMP Chart error: ${res.status}`);
-    const data = await res.json();
+    if (!chartRes.ok) throw new Error(`FMP Chart error: ${chartRes.status}`);
+    const chartData = await chartRes.json();
+    if (!Array.isArray(chartData)) throw new Error('Invalid chart data');
 
-    if (!Array.isArray(data)) return getMockChartData();
-
-    return data.slice(-100).map((d: Record<string, string | number>) => ({
+    const candles: CandleData[] = chartData.slice(-100).map((d: Record<string, string | number>) => ({
       timestamp: new Date(d.date as string).getTime(),
       open: Number(d.open),
       high: Number(d.high),
@@ -147,6 +152,24 @@ export async function getHistoricalChart(
       close: Number(d.close),
       volume: Number(d.volume),
     }));
+
+    // 실시간 quote 추가
+    if (quoteRes.ok) {
+      const quoteData = await quoteRes.json();
+      if (Array.isArray(quoteData) && quoteData.length > 0) {
+        const q = quoteData[0];
+        candles.push({
+          timestamp: Date.now(),
+          open: Number(q.open),
+          high: Number(q.dayHigh),
+          low: Number(q.dayLow),
+          close: Number(q.price),
+          volume: Number(q.volume),
+        });
+      }
+    }
+
+    return candles;
   } catch (error) {
     console.error('FMP getHistoricalChart error:', error);
     return getMockChartData();
@@ -226,9 +249,7 @@ function capitalizeRating(r: string): string {
 
 export function getMockQuotes(symbols: string[]): Quote[] {
   const base: Record<string, Omit<Quote, 'symbol'>> = {
-    'NQUSD': { price: 21285.5, changesPercentage: 0.42, change: 89.2, dayLow: 21150.0, dayHigh: 21320.0, yearHigh: 22500.0, yearLow: 17500.0, marketCap: 0, priceAvg50: 20900.0, priceAvg200: 19800.0, volume: 450000, avgVolume: 420000, exchange: 'CME', open: 21200.0, previousClose: 21196.3, eps: 0, pe: 0 },
-    'GCUSD': { price: 4814.7, changesPercentage: 0.13, change: 6.4, dayLow: 4785.9, dayHigh: 4827.2, yearHigh: 5626.8, yearLow: 3123.3, marketCap: 0, priceAvg50: 4891.3, priceAvg200: 4377.5, volume: 280290, avgVolume: 250000, exchange: 'COMMODITY', open: 4811.8, previousClose: 4808.3, eps: 0, pe: 0 },
-    'CLUSD': { price: 64.82, changesPercentage: -0.45, change: -0.29, dayLow: 64.10, dayHigh: 65.30, yearHigh: 82.50, yearLow: 55.80, marketCap: 0, priceAvg50: 66.50, priceAvg200: 70.20, volume: 380000, avgVolume: 350000, exchange: 'NYMEX', open: 65.11, previousClose: 65.11, eps: 0, pe: 0 },
+    'GCUSD': { price: 4814.7, changesPercentage: 0.13, change: 6.4, dayLow: 4785.9, dayHigh: 4827.2, yearHigh: 5626.8, yearLow: 3123.3, marketCap: 0, priceAvg50: 4891.3, priceAvg200: 4377.5, volume: 28029, avgVolume: 25000, exchange: 'COMMODITY', open: 4811.8, previousClose: 4808.3, eps: 0, pe: 0 },
     'AAPL': { price: 263.4, changesPercentage: 1.23, change: 3.2, dayLow: 260.0, dayHigh: 264.5, yearHigh: 270.0, yearLow: 200.0, marketCap: 4000000000000, priceAvg50: 255.0, priceAvg200: 240.0, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 260.5, previousClose: 260.2, eps: 6.58, pe: 40.0 },
     'NVDA': { price: 198.35, changesPercentage: 3.45, change: 6.6, dayLow: 192.0, dayHigh: 200.5, yearHigh: 210.0, yearLow: 100.0, marketCap: 4800000000000, priceAvg50: 185.0, priceAvg200: 160.0, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 191.8, previousClose: 191.7, eps: 3.20, pe: 61.8 },
     'TSLA': { price: 388.9, changesPercentage: -2.34, change: -9.3, dayLow: 382.0, dayHigh: 400.0, yearHigh: 420.0, yearLow: 250.0, marketCap: 1200000000000, priceAvg50: 370.0, priceAvg200: 340.0, volume: 95234000, avgVolume: 90000000, exchange: 'NASDAQ', open: 398.2, previousClose: 398.2, eps: 4.20, pe: 92.6 },
