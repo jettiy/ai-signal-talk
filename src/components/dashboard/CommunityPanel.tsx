@@ -271,13 +271,13 @@ function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: an
 
     return () => {
       observer.disconnect();
-      chart.remove();
+      try { chart.remove(); } catch {}
     };
   }, [symbol, displayData]);
 
   useEffect(() => {
     const cleanup = initChart();
-    return () => cleanup?.();
+    return () => { try { cleanup?.(); } catch {} };
   }, [initChart]);
 
   return <div ref={containerRef} className="w-full h-full" />;
