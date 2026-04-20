@@ -76,6 +76,8 @@ const MINI_CHART_ASSETS = [
 // ── 시간프레임 ──────────────────────────────────────────────
 const TIMEFRAMES = [
   { id: '1min', label: '1M' },
+  { id: '5min', label: '5M' },
+  { id: '15min', label: '15M' },
   { id: '30min', label: '30M' },
   { id: '1hour', label: '1H' },
   { id: '1day', label: '1D' },
