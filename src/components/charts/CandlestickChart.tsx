@@ -27,20 +27,30 @@ interface Props {
 export default function CandlestickChart({ data, volumeData, signal }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
+  const dataRef = useRef(data);
+  const volumeDataRef = useRef(volumeData);
+  const signalRef = useRef(signal);
 
+  // 최신 props를 ref에 유지
+  dataRef.current = data;
+  volumeDataRef.current = volumeData;
+  signalRef.current = signal;
+
+  // 차트 초기화 (한 번만)
   const initChart = useCallback(() => {
     if (!containerRef.current) return;
 
     // 기존 차트 제거
     if (chartRef.current) {
-      chartRef.current.remove();
+      try { chartRef.current.remove(); } catch {}
       chartRef.current = null;
     }
 
     const container = containerRef.current;
     const chart = createChart(container, {
-      width: container.clientWidth,
-      height: container.clientHeight,
+      width: container.clientWidth || 400,
+      height: container.clientHeight || 300,
       layout: {
         background: { color: 'transparent' },
         textColor: '#A0A0A0',
@@ -66,7 +76,7 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
       },
     });
 
-    // 캔들스틱 시리즈 — v5 API: chart.addSeries(CandlestickSeries, options)
+    // 캔들스틱 시리즈
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#00FF41',
       downColor: '#FF3B3B',
@@ -75,9 +85,10 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
       wickUpColor: '#00FF41',
       wickDownColor: '#FF3B3B',
     });
+    candleSeriesRef.current = candleSeries;
 
-    // 볼륨 시리즈
-    if (volumeData && volumeData.length > 0) {
+    // 볼륨 시리즈 (필요 시)
+    if (volumeDataRef.current && volumeDataRef.current.length > 0) {
       const volumeSeries = chart.addSeries(HistogramSeries, {
         priceFormat: { type: 'volume' },
         priceScaleId: 'volume',
@@ -85,20 +96,46 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
       chart.priceScale('volume').applyOptions({
         scaleMargins: { top: 0.8, bottom: 0 },
       });
-      volumeSeries.setData(volumeData);
+      volumeSeries.setData(volumeDataRef.current);
     }
 
-    // 데이터 설정
-    if (data.length > 0) {
-      candleSeries.setData(data);
+    chartRef.current = chart;
 
-      // 시그널 오버레이
-      if (signal) {
-        const lastCandle = data[data.length - 1];
+    // 리사이즈 핸들러
+    const handleResize = () => {
+      try {
+        if (container && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: container.clientWidth,
+            height: container.clientHeight,
+          });
+        }
+      } catch {}
+    };
 
-        // 진입가 라인
-        candleSeries.createPriceLine({
-          price: signal.entryPrice,
+    const observer = new ResizeObserver(handleResize);
+    observer.observe(container);
+
+    return () => {
+      observer.disconnect();
+      try { chart.remove(); } catch {}
+    };
+  }, []); // 마운트 시 한 번만
+
+  // 데이터/시그널 업데이트 (차트 재생성 없이)
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series || !dataRef.current || dataRef.current.length === 0) return;
+
+    try {
+      series.setData(dataRef.current);
+
+      // 기존 price lines 제거 후 재생성
+      // (v5에서는 createPriceLine이 매번 새로 만듦)
+      // 진입가 라인
+      if (signalRef.current) {
+        series.createPriceLine({
+          price: signalRef.current.entryPrice,
           color: '#FFFFFF',
           lineWidth: 1,
           lineStyle: 2,
@@ -107,8 +144,8 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
         });
 
         // 목표가 라인
-        candleSeries.createPriceLine({
-          price: signal.targetPrice,
+        series.createPriceLine({
+          price: signalRef.current.targetPrice,
           color: '#00FF41',
           lineWidth: 1,
           lineStyle: 0,
@@ -117,8 +154,8 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
         });
 
         // 손절가 라인
-        candleSeries.createPriceLine({
-          price: signal.stopLoss,
+        series.createPriceLine({
+          price: signalRef.current.stopLoss,
           color: '#FF3B3B',
           lineWidth: 1,
           lineStyle: 0,
@@ -127,29 +164,12 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
         });
       }
 
-      chart.timeScale().fitContent();
+      chartRef.current?.timeScale().fitContent();
+    } catch (e) {
+      // "Object is disposed" 등 무시
+      console.warn('Chart update error:', (e as Error).message);
     }
-
-    chartRef.current = chart;
-
-    // 리사이즈 핸들러
-    const handleResize = () => {
-      if (container && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: container.clientWidth,
-          height: container.clientHeight,
-        });
-      }
-    };
-
-    const observer = new ResizeObserver(handleResize);
-    observer.observe(container);
-
-    return () => {
-      observer.disconnect();
-      chart.remove();
-    };
-  }, [data, volumeData, signal]);
+  }, [data, signal]);
 
   useEffect(() => {
     const cleanup = initChart();
