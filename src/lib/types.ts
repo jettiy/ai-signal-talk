@@ -71,13 +71,13 @@ export interface AiSignalResult {
   signalType: 'LONG' | 'SHORT';
   model: string;
 
-  // Z.AI 확장 필드
-  buyProbability: number;       // 매수 확률 (0~100)
-  sellProbability: number;      // 매도 확률 (0~100)
-  riskRewardRatio: number;      // 손익비
-  predictionType: string;       // "다음 봉 예측" | "현재봉 마감"
-  reasoning: string;            // Thinking Mode 추론 과정 (빈 문자열 가능)
-  sources: SignalSource[];      // 참조 소스 (웹검색 결과)
+  // Z.AI 확장 필드 (optional — API에서 없을 수 있음)
+  buyProbability?: number;       // 매수 확률 (0~100)
+  sellProbability?: number;      // 매도 확률 (0~100)
+  riskRewardRatio?: number;      // 손익비
+  predictionType?: string;       // "다음 봉 예측" | "현재봉 마감"
+  reasoning?: string;            // Thinking Mode 추론 과정 (빈 문자열 가능)
+  sources?: SignalSource[];      // 참조 소스 (웹검색 결과)
 }
 
 export interface SignalSource {

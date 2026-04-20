@@ -8,7 +8,7 @@ import { webSearch } from './zai-web-search';
 import { MODEL_CHAT } from './ai';
 
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
-const ZAI_BASE = 'https://api.z.ai/api/paas/v4';
+const ZAI_BASE = 'https://open.bigmodel.cn/api/paas/v4';
 
 // Function Calling 도구 정의
 const AGENT_TOOLS = [

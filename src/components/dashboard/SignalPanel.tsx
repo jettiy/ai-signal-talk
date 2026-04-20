@@ -152,18 +152,18 @@ export default function SignalPanel() {
   const displaySignal = aiResult
     ? {
         direction: (aiResult.signalType === 'LONG' ? 'buy' : 'sell') as 'buy' | 'sell',
-        buyProb: aiResult.buyProbability,
-        sellProb: aiResult.sellProbability,
-        entry: aiResult.entryPrice.toLocaleString(),
-        stopLoss: aiResult.stopLoss.toLocaleString(),
-        takeProfit: aiResult.targetPrice.toLocaleString(),
+        buyProb: aiResult.buyProbability ?? (aiResult.signalType === 'LONG' ? aiResult.confidence : 100 - aiResult.confidence),
+        sellProb: aiResult.sellProbability ?? (aiResult.signalType === 'SHORT' ? aiResult.confidence : 100 - aiResult.confidence),
+        entry: aiResult.entryPrice?.toLocaleString() ?? '-',
+        stopLoss: aiResult.stopLoss?.toLocaleString() ?? '-',
+        takeProfit: aiResult.targetPrice?.toLocaleString() ?? '-',
         riskReward: aiResult.riskRewardRatio?.toString() || fallback.riskReward,
-        confidence: aiResult.confidence,
-        rationale: aiResult.rationale,
+        confidence: aiResult.confidence ?? 50,
+        rationale: aiResult.rationale || '',
         predictionType: aiResult.predictionType || predictionType,
-        reasoning: aiResult.reasoning,
-        sources: aiResult.sources,
-        model: aiResult.model,
+        reasoning: aiResult.reasoning || '',
+        sources: aiResult.sources || [],
+        model: aiResult.model || '',
       }
     : { ...fallback, reasoning: '', sources: [], model: '' };
 

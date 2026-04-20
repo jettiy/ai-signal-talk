@@ -5,7 +5,7 @@
 import { WebSearchResult } from './types';
 
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
-const ZAI_BASE = 'https://api.z.ai/api/paas/v4';
+const ZAI_BASE = 'https://open.bigmodel.cn/api/paas/v4';
 
 // 한국어 금융 검색을 위한 쿼리 빌더
 function buildFinancialQuery(symbol: string, label: string): string {
@@ -101,7 +101,7 @@ export async function webSearchInChat(
         'Accept-Language': 'ko-KR,ko;q=0.9',
       },
       body: JSON.stringify({
-        model: 'glm-4.7-flashx',
+        model: 'glm-4.5-air',
         messages: [
           {
             role: 'system',
