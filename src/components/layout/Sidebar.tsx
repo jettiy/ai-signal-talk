@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import {
   MessageCircle,
   Zap,
@@ -47,14 +47,7 @@ export default function Sidebar({ active, onNavigate, userRole }: SidebarProps) 
     >
       {/* 로고 */}
       <div className="mb-5">
-        <Image
-          src="/logo.png"
-          alt="AI 시그널톡"
-          width={40}
-          height={40}
-          className="rounded-lg"
-          style={{ objectFit: 'contain' }}
-        />
+        <SignalChartLogo size={40} />
       </div>
 
       {/* 네비게이션 */}

@@ -20,7 +20,7 @@ const config: Config = {
         border: 'var(--border)',
       },
       fontFamily: {
-        sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        sans: ['Space Grotesk', 'Pretendard', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
       },
     },

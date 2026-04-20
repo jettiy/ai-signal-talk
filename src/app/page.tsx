@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import Link from 'next/link';
 
 export default function LandingPage() {
@@ -54,13 +54,7 @@ export default function LandingPage() {
       <div className="w-full max-w-sm px-6">
         {/* 로고 */}
         <div className="flex justify-center mb-10">
-          <Image
-            src="/logo.png"
-            alt="AI 시그널톡"
-            width={186}
-            height={48}
-            priority
-          />
+          <SignalChartLogo size={186} showText />
         </div>
 
         {/* 로그인 카드 */}
