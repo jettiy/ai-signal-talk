@@ -114,7 +114,7 @@ export async function getHistoricalChart(
   timeframe = '30min'
 ): Promise<CandleData[]> {
   if (!FMP_API_KEY) {
-    return getMockChartData();
+    return getMockChartData(symbol);
   }
 
   const periodMap: Record<string, string> = {
@@ -172,7 +172,7 @@ export async function getHistoricalChart(
     return candles;
   } catch (error) {
     console.error('FMP getHistoricalChart error:', error);
-    return getMockChartData();
+    return getMockChartData(symbol);
   }
 }
 
@@ -250,6 +250,8 @@ function capitalizeRating(r: string): string {
 export function getMockQuotes(symbols: string[]): Quote[] {
   const base: Record<string, Omit<Quote, 'symbol'>> = {
     'GCUSD': { price: 4814.7, changesPercentage: 0.13, change: 6.4, dayLow: 4785.9, dayHigh: 4827.2, yearHigh: 5626.8, yearLow: 3123.3, marketCap: 0, priceAvg50: 4891.3, priceAvg200: 4377.5, volume: 28029, avgVolume: 25000, exchange: 'COMMODITY', open: 4811.8, previousClose: 4808.3, eps: 0, pe: 0 },
+    'NQUSD': { price: 21285.5, changesPercentage: 0.42, change: 89.2, dayLow: 21150, dayHigh: 21320, yearHigh: 22500, yearLow: 18500, marketCap: 0, priceAvg50: 20800, priceAvg200: 19500, volume: 150000, avgVolume: 120000, exchange: 'COMMODITY', open: 21200, previousClose: 21196.3, eps: 0, pe: 0 },
+    'CLUSD': { price: 64.8, changesPercentage: -0.35, change: -0.23, dayLow: 64.2, dayHigh: 65.1, yearHigh: 82.5, yearLow: 55.0, marketCap: 0, priceAvg50: 67.5, priceAvg200: 71.2, volume: 250000, avgVolume: 220000, exchange: 'COMMODITY', open: 65.03, previousClose: 65.03, eps: 0, pe: 0 },
     'AAPL': { price: 263.4, changesPercentage: 1.23, change: 3.2, dayLow: 260.0, dayHigh: 264.5, yearHigh: 270.0, yearLow: 200.0, marketCap: 4000000000000, priceAvg50: 255.0, priceAvg200: 240.0, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 260.5, previousClose: 260.2, eps: 6.58, pe: 40.0 },
     'NVDA': { price: 198.35, changesPercentage: 3.45, change: 6.6, dayLow: 192.0, dayHigh: 200.5, yearHigh: 210.0, yearLow: 100.0, marketCap: 4800000000000, priceAvg50: 185.0, priceAvg200: 160.0, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 191.8, previousClose: 191.7, eps: 3.20, pe: 61.8 },
     'TSLA': { price: 388.9, changesPercentage: -2.34, change: -9.3, dayLow: 382.0, dayHigh: 400.0, yearHigh: 420.0, yearLow: 250.0, marketCap: 1200000000000, priceAvg50: 370.0, priceAvg200: 340.0, volume: 95234000, avgVolume: 90000000, exchange: 'NASDAQ', open: 398.2, previousClose: 398.2, eps: 4.20, pe: 92.6 },
@@ -334,18 +336,27 @@ export function getMockNews(): NewsItem[] {
   ];
 }
 
-export function getMockChartData(): CandleData[] {
+export function getMockChartData(symbol = 'GCUSD'): CandleData[] {
   const now = Date.now();
   const data: CandleData[] = [];
-  let price = 4810;
+
+  // 종목별 기준가격과 변동성 설정
+  const config: Record<string, { basePrice: number; volatility: number }> = {
+    'NQUSD': { basePrice: 21285, volatility: 15 },
+    'GCUSD': { basePrice: 4810, volatility: 4 },
+    'CLUSD': { basePrice: 64.8, volatility: 0.3 },
+  };
+  const { basePrice, volatility } = config[symbol] || config['GCUSD'];
+
+  let price = basePrice;
 
   for (let i = 0; i < 100; i++) {
     const t = now - (100 - i) * 5 * 60 * 1000;
-    const change = (Math.random() - 0.48) * 4;
+    const change = (Math.random() - 0.48) * volatility;
     const open = price;
     const close = price + change;
-    const high = Math.max(open, close) + Math.random() * 2;
-    const low = Math.min(open, close) - Math.random() * 2;
+    const high = Math.max(open, close) + Math.random() * volatility * 0.5;
+    const low = Math.min(open, close) - Math.random() * volatility * 0.5;
     data.push({
       timestamp: t,
       open: +open.toFixed(2),

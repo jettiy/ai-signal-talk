@@ -17,6 +17,8 @@ import {
 const GRADE_STYLES: Record<string, { color: string; bg: string }> = {
   WHALE: { color: '#FFD700', bg: 'rgba(255,215,0,0.1)' },
   PRO: { color: '#00FF41', bg: 'rgba(0,255,65,0.1)' },
+  ADMIN: { color: '#FFD700', bg: 'rgba(255,215,0,0.1)' },
+  BASIC: { color: '#555', bg: 'rgba(85,85,85,0.1)' },
   'TOP 1%': { color: '#FF6B6B', bg: 'rgba(255,107,107,0.1)' },
   'LV.05': { color: '#A855F7', bg: 'rgba(168,85,247,0.1)' },
   BOT: { color: '#00B4D8', bg: 'rgba(0,180,216,0.1)' },
@@ -74,6 +76,13 @@ const TIMEFRAMES = [
   { id: '30min', label: '30M' },
   { id: '1hour', label: '1H' },
   { id: '1day', label: '1D' },
+];
+
+// ── @멘션 자동완성 옵션 ──────────────────────────────────
+const MENTION_OPTIONS = [
+  { key: 'AI', desc: 'AI 분석가 (Z.AI GLM 호출)', emoji: '⚡' },
+  { key: '시그널', desc: '시그널 봇 (시그널 요약)', emoji: '📊' },
+  { key: '뉴스', desc: '뉴스 봇 (최신 뉴스 요약)', emoji: '📰' },
 ];
 
 // ── 미니차트 Mock 데이터 ────────────────────────────────────
@@ -251,21 +260,107 @@ export default function CommunityPanel() {
   >(MOCK_MESSAGES);
   const [aiLoading, setAiLoading] = useState(false);
   const [signalLoading, setSignalLoading] = useState(false);
+  const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filteredMessages = activeChannel === 'general'
     ? chatMessages
     : chatMessages.filter((m) => m.channel === activeChannel);
 
-  // AI 채팅 에이전트 호출
+  // ── @멘션 감지 헬퍼 ──────────────────────────────────
+  const getCurrentMention = (text: string) => {
+    const match = text.match(/@([^\s@]*)$/);
+    if (match) {
+      return { atIndex: match.index!, filter: match[1] };
+    }
+    return null;
+  };
+
+  const getFilteredMentionOptions = () => {
+    const mention = getCurrentMention(input);
+    if (!mention) return MENTION_OPTIONS;
+    return MENTION_OPTIONS.filter(opt =>
+      opt.key.toLowerCase().startsWith(mention.filter.toLowerCase())
+    );
+  };
+
+  const selectMention = (optionKey: string) => {
+    const mention = getCurrentMention(input);
+    if (mention) {
+      const before = input.slice(0, mention.atIndex);
+      const after = input.slice(mention.atIndex + 1 + mention.filter.length);
+      setInput(before + '@' + optionKey + ' ' + after);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+    setMentionDropdownOpen(false);
+    setMentionIndex(0);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInput(value);
+
+    const mention = getCurrentMention(value);
+    if (mention) {
+      const filtered = MENTION_OPTIONS.filter(opt =>
+        opt.key.toLowerCase().startsWith(mention.filter.toLowerCase())
+      );
+      if (filtered.length > 0) {
+        setMentionDropdownOpen(true);
+        setMentionIndex(0);
+      } else {
+        setMentionDropdownOpen(false);
+      }
+    } else {
+      setMentionDropdownOpen(false);
+    }
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const filtered = mentionDropdownOpen ? getFilteredMentionOptions() : [];
+
+    if (mentionDropdownOpen && filtered.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % filtered.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev - 1 + filtered.length) % filtered.length);
+        return;
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (filtered[mentionIndex]) {
+          selectMention(filtered[mentionIndex].key);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionDropdownOpen(false);
+        return;
+      }
+    }
+
+    if (e.key === 'Enter' && !mentionDropdownOpen) {
+      handleSend();
+    }
+  };
+
+  // AI 채팅 에이전트 호출 (+ @멘션 분기)
   const handleSend = async () => {
     if (!input.trim() || aiLoading) return;
     const userMsg = input.trim();
     setInput('');
+    setMentionDropdownOpen(false);
 
     // 사용자 메시지 추가
     const userMsgObj = {
       id: Date.now(),
-      grade: 'NEW',
+      grade: 'BASIC',
       nickname: '나',
       msg: userMsg,
       time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
@@ -273,7 +368,73 @@ export default function CommunityPanel() {
     };
     setChatMessages((prev) => [...prev, userMsgObj]);
 
-    // AI 응답
+    // ── @AI 멘션 → AI 분석가 전용 처리 ─────────────────
+    if (userMsg.includes('@AI')) {
+      const query = userMsg.replace(/@AI\s*/, '').trim();
+      if (!query) return;
+      setAiLoading(true);
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: query }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.content) {
+            setChatMessages((prev) => [...prev, {
+              id: Date.now() + 1,
+              grade: 'BOT',
+              nickname: '@AI',
+              msg: data.content,
+              time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+              channel: activeChannel,
+            }]);
+          }
+        }
+      } catch {
+        // AI 응답 실패 시 조용히 무시
+      }
+      setAiLoading(false);
+      return;
+    }
+
+    // ── @시그널 멘션 → 시그널 봇 Mock 응답 ─────────────
+    if (userMsg.includes('@시그널')) {
+      const assetInfo = MINI_CHART_ASSETS.find(a => a.id === activeMiniAsset);
+      const entryPrice = activeMiniAsset === 'NQUSD' ? '21,210.50' : activeMiniAsset === 'GCUSD' ? '4,810.20' : '64.50';
+      const targetPrice = activeMiniAsset === 'NQUSD' ? '21,450.00' : activeMiniAsset === 'GCUSD' ? '4,880.00' : '66.20';
+      const direction = assetInfo?.dir === 'buy' ? '매수' : '매도';
+      const confidence = 76;
+
+      setChatMessages((prev) => [...prev, {
+        id: Date.now() + 1,
+        grade: 'BOT',
+        nickname: '@시그널',
+        msg: `📊 현재 ${assetInfo?.label || activeMiniAsset}(${activeMiniAsset}) ${direction} 시그널 감지. 신뢰도 ${confidence}%. 진입가 ${entryPrice} → 목표가 ${targetPrice}`,
+        time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        channel: activeChannel,
+      }]);
+      return;
+    }
+
+    // ── @뉴스 멘션 → 뉴스 봇 Mock 응답 ─────────────────
+    if (userMsg.includes('@뉴스')) {
+      const topNews = MOCK_NEWS.slice(0, 3);
+      const newsSummary = topNews.map((n, i) => `${i + 1}. ${n.title}`).join('\n');
+
+      setChatMessages((prev) => [...prev, {
+        id: Date.now() + 1,
+        grade: 'BOT',
+        nickname: '@뉴스',
+        msg: `📰 최신 뉴스 요약:\n${newsSummary}`,
+        time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+        channel: activeChannel,
+      }]);
+      return;
+    }
+
+    // ── 기본: 기존 /api/chat 호출 ──────────────────────
     setAiLoading(true);
     try {
       const res = await fetch('/api/chat', {
@@ -399,7 +560,7 @@ export default function CommunityPanel() {
         {/* 채팅 메시지 */}
         <div className="flex-1 overflow-y-auto p-5 space-y-3">
           {filteredMessages.map((msg) => {
-            const style = GRADE_STYLES[msg.grade] || GRADE_STYLES.NEW;
+            const style = GRADE_STYLES[msg.grade] || GRADE_STYLES.BASIC;
             const isBot = msg.grade === 'BOT';
             return (
               <div key={msg.id} className="flex gap-3">
@@ -418,14 +579,19 @@ export default function CommunityPanel() {
                 {/* 메시지 */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span
-                      className="text-[9px] font-bold px-1.5 py-0.5 rounded"
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded"
                       style={{ background: style.bg, color: style.color }}
                     >
                       {msg.grade}
                     </span>
                     <span className="text-[11px] font-semibold" style={{ color: isBot ? '#00B4D8' : '#FFF' }}>
-                      {msg.nickname}
+                      {msg.nickname.startsWith('@') ? (
+                        <>
+                          <span style={{ color: '#00FF41' }}>@</span>
+                          <Zap size={10} style={{ color: '#00B4D8', display: 'inline', verticalAlign: 'middle', margin: '0 2px' }} />
+                          <span style={{ color: '#00B4D8' }}>{msg.nickname.slice(1)}</span>
+                        </>
+                      ) : msg.nickname}
                     </span>
                     <span className="text-[9px] ml-auto" style={{ color: '#333' }}>{msg.time}</span>
                   </div>
@@ -435,6 +601,7 @@ export default function CommunityPanel() {
                       color: '#CCC',
                       background: isBot ? 'rgba(0,180,216,0.04)' : 'rgba(255,255,255,0.02)',
                       borderLeft: isBot ? '2px solid rgba(0,180,216,0.3)' : '2px solid transparent',
+                      whiteSpace: 'pre-wrap',
                     }}
                   >
                     {msg.msg}
@@ -447,13 +614,38 @@ export default function CommunityPanel() {
 
         {/* 입력 영역 */}
         <div className="shrink-0 p-3" style={{ borderTop: '1px solid #1A1A1A', background: '#0A0A0F' }}>
+          {/* @멘션 자동완성 드롭다운 */}
+          {mentionDropdownOpen && getFilteredMentionOptions().length > 0 && (
+            <div
+              className="mb-2 rounded-lg overflow-hidden"
+              style={{ background: '#111118', border: '1px solid #1A1A1A' }}
+            >
+              {getFilteredMentionOptions().map((opt, idx) => (
+                  <div
+                    key={opt.key}
+                    className="px-3 py-2 cursor-pointer flex items-center gap-2 transition-all"
+                    style={{
+                      background: idx === mentionIndex ? 'rgba(0,255,65,0.08)' : 'transparent',
+                    }}
+                    onMouseEnter={() => setMentionIndex(idx)}
+                    onClick={() => selectMention(opt.key)}
+                  >
+                    <span className="text-[14px]">{opt.emoji}</span>
+                    <span className="text-[12px]" style={{ color: '#00FF41', fontWeight: 'bold' }}>@</span>
+                    <span className="text-[12px] font-bold" style={{ color: '#00B4D8' }}>{opt.key}</span>
+                    <span className="text-[10px] ml-1" style={{ color: '#555' }}>— {opt.desc}</span>
+                  </div>
+              ))}
+            </div>
+          )}
           <div className="flex gap-2">
             <input
+              ref={inputRef}
               type="text"
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
-              placeholder="AI에게 질문하세요... (예: 골드 지금 어때?)"
+              onChange={handleInputChange}
+              onKeyDown={handleInputKeyDown}
+              placeholder="@AI 골드 전망 어때?"
               className="flex-1 px-4 py-2.5 rounded-xl text-[12px] outline-none"
               style={{ background: '#111118', border: '1px solid #1A1A1A', color: 'white' }}
               disabled={aiLoading}

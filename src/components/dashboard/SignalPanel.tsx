@@ -14,10 +14,12 @@ import TradeHistory from './signal/TradeHistory';
 import EconomicCalendar from './signal/EconomicCalendar';
 import { Zap, History, BarChart3, Brain, ExternalLink, Loader2 } from 'lucide-react';
 import { useAiSignal } from '@/hooks/useAiSignal';
+import { useAiSignalStream } from '@/hooks/useAiSignalStream';
 import { useMarketData } from '@/hooks/useMarketData';
 import { useChartData } from '@/hooks/useChartData';
 import { useNews } from '@/hooks/useNews';
-import { AiSignalResult, FUTURES_SYMBOLS, getPredictionType } from '@/lib/types';
+import { AiSignalResult, FUTURES_SYMBOLS, getPredictionType, UserRole } from '@/lib/types';
+import UserBadge from './UserBadge';
 
 // ── Timeframe 설정 ──────────────────────────────────────────────
 const TIMEFRAMES = [
@@ -39,65 +41,83 @@ const ASSETS = [
 ] as const;
 
 // ── Fallback Mock (API 응답 없을 때) ──────────────────────────
-// 나스닥선물 기준 가격 (NQUSD ~21,285)
-const FALLBACK_SIGNALS: Record<TimeframeId, {
-  direction: 'buy' | 'sell';
-  buyProb: number;
-  sellProb: number;
-  entry: string;
-  stopLoss: string;
-  takeProfit: string;
-  riskReward: string;
-  confidence: number;
-  rationale: string;
-  predictionType: string;
-}> = {
-  '1min': {
-    direction: 'buy', buyProb: 62, sellProb: 38,
-    entry: '21,285', stopLoss: '21,275', takeProfit: '21,310',
-    riskReward: '2.5', confidence: 58,
-    predictionType: '다음 봉 예측',
-    rationale: '1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지.',
-  },
-  '5min': {
-    direction: 'sell', buyProb: 35, sellProb: 65,
-    entry: '21,290', stopLoss: '21,310', takeProfit: '21,240',
-    riskReward: '2.5', confidence: 65,
-    predictionType: '다음 봉 예측',
-    rationale: '5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환.',
-  },
-  '15min': {
-    direction: 'buy', buyProb: 71, sellProb: 29,
-    entry: '21,280', stopLoss: '21,250', takeProfit: '21,350',
-    riskReward: '2.3', confidence: 71,
-    predictionType: '현재봉 마감',
-    rationale: '15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생.',
-  },
-  '30min': {
-    direction: 'buy', buyProb: 58, sellProb: 42,
-    entry: '21,275', stopLoss: '21,240', takeProfit: '21,340',
-    riskReward: '1.86', confidence: 58,
-    predictionType: '현재봉 마감',
-    rationale: '30분봉 EMA50 지지선 테스트 중. 매수세 유입 확인.',
-  },
-  '1hour': {
-    direction: 'sell', buyProb: 40, sellProb: 60,
-    entry: '21,295', stopLoss: '21,340', takeProfit: '21,200',
-    riskReward: '2.1', confidence: 60,
-    predictionType: '현재봉 마감',
-    rationale: '1시간봉 더블탑 패턴 완성. RSI 70 과매수.',
-  },
-  '1day': {
-    direction: 'buy', buyProb: 74, sellProb: 26,
-    entry: '21,270', stopLoss: '21,100', takeProfit: '21,600',
-    riskReward: '1.94', confidence: 74,
-    predictionType: '현재봉 마감',
-    rationale: '일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항.',
-  },
+// 종목별 가격 기준 설정
+const FALLBACK_BASE_PRICES: Record<string, { price: number; unit: number; stopUnit: number }> = {
+  NQUSD: { price: 21285, unit: 10, stopUnit: 35 },
+  GCUSD: { price: 4810, unit: 3, stopUnit: 15 },
+  CLUSD: { price: 64.8, unit: 0.2, stopUnit: 0.8 },
 };
 
+// 종목별·시간프레임별 폴백 시그널 생성 함수
+function getFallbackSignal(asset: string, tf: TimeframeId) {
+  const base = FALLBACK_BASE_PRICES[asset] || FALLBACK_BASE_PRICES['NQUSD'];
+  const p = base.price;
+  const u = base.unit;
+  const su = base.stopUnit;
+
+  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: asset === 'CLUSD' ? 2 : 0, maximumFractionDigits: asset === 'CLUSD' ? 2 : 0 });
+
+  const signals: Record<TimeframeId, {
+    direction: 'buy' | 'sell';
+    buyProb: number;
+    sellProb: number;
+    entry: string;
+    stopLoss: string;
+    takeProfit: string;
+    riskReward: string;
+    confidence: number;
+    rationale: string;
+    predictionType: string;
+  }> = {
+    '1min': {
+      direction: 'buy', buyProb: 62, sellProb: 38,
+      entry: fmt(p), stopLoss: fmt(p - u), takeProfit: fmt(p + 2.5 * u),
+      riskReward: '2.5', confidence: 58,
+      predictionType: '다음 봉 예측',
+      rationale: '1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지.',
+    },
+    '5min': {
+      direction: 'sell', buyProb: 35, sellProb: 65,
+      entry: fmt(p + 0.5 * u), stopLoss: fmt(p + 2 * u), takeProfit: fmt(p - 5 * u),
+      riskReward: '2.5', confidence: 65,
+      predictionType: '다음 봉 예측',
+      rationale: '5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환.',
+    },
+    '15min': {
+      direction: 'buy', buyProb: 71, sellProb: 29,
+      entry: fmt(p - 0.5 * u), stopLoss: fmt(p - su), takeProfit: fmt(p + 3.5 * u * 2),
+      riskReward: '2.3', confidence: 71,
+      predictionType: '현재봉 마감',
+      rationale: '15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생.',
+    },
+    '30min': {
+      direction: 'buy', buyProb: 58, sellProb: 42,
+      entry: fmt(p - u), stopLoss: fmt(p - su), takeProfit: fmt(p + 3.4 * u),
+      riskReward: '1.86', confidence: 58,
+      predictionType: '현재봉 마감',
+      rationale: '30분봉 EMA50 지지선 테스트 중. 매수세 유입 확인.',
+    },
+    '1hour': {
+      direction: 'sell', buyProb: 40, sellProb: 60,
+      entry: fmt(p + u), stopLoss: fmt(p + 4.5 * u), takeProfit: fmt(p - 6.3 * u),
+      riskReward: '2.1', confidence: 60,
+      predictionType: '현재봉 마감',
+      rationale: '1시간봉 더블탑 패턴 완성. RSI 70 과매수.',
+    },
+    '1day': {
+      direction: 'buy', buyProb: 74, sellProb: 26,
+      entry: fmt(p - 1.5 * u), stopLoss: fmt(p - su * 5), takeProfit: fmt(p + su * 9),
+      riskReward: '1.94', confidence: 74,
+      predictionType: '현재봉 마감',
+      rationale: '일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항.',
+    },
+  };
+
+  return signals[tf];
+}
+
 // ── 메인 컴포넌트 ────────────────────────────────────────────────
-export default function SignalPanel() {
+export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRole?: UserRole }) {
   const [timeframe, setTimeframe] = useState<TimeframeId>('15min');
   const [asset, setAsset] = useState<string>('NQUSD');
   const [rightTab, setRightTab] = useState<'signal' | 'history'>('signal');
@@ -113,13 +133,27 @@ export default function SignalPanel() {
   // 뉴스
   const { data: news } = useNews({ symbol: asset });
 
-  // AI 시그널
+  // AI 시그널 (폴백용 기존 훅 유지)
   const signalMutation = useAiSignal();
 
-  // 시그널 수동 생성 (버튼 클릭 시에만)
+  // AI 시그널 스트리밍 (Thinking Mode 라이브)
+  const {
+    thinkingText,
+    isThinking: isStreamThinking,
+    isLoading: isStreamLoading,
+    isComplete: isStreamComplete,
+    result: streamResult,
+    error: streamError,
+    startStream,
+    reset: resetStream,
+  } = useAiSignalStream();
+
+  // 시그널 수동 생성 — 스트리밍 모드 우선
   const generateSignal = useCallback(() => {
     if (!currentQuote) return;
-    signalMutation.mutate({
+
+    // 스트리밍 모드로 시작
+    startStream({
       symbol: asset,
       price: currentQuote.price,
       changePct: currentQuote.changesPercentage,
@@ -130,17 +164,44 @@ export default function SignalPanel() {
       })),
       timeframe,
     });
-  }, [asset, timeframe, currentQuote, news]);
+  }, [asset, timeframe, currentQuote, news, startStream]);
 
-  // AI 결과 업데이트
+  // 스트리밍 완료 시 AI 결과 업데이트
+  useEffect(() => {
+    if (isStreamComplete && streamResult) {
+      setAiResult(streamResult);
+    }
+  }, [isStreamComplete, streamResult]);
+
+  // 기존 mutation 결과도 처리 (폴백)
   useEffect(() => {
     if (signalMutation.data) {
       setAiResult(signalMutation.data);
     }
   }, [signalMutation.data]);
 
+  // 스트리밍 에러 시 폴백
+  useEffect(() => {
+    if (streamError) {
+      console.warn('스트리밍 실패, 기존 API로 폴백:', streamError);
+      if (currentQuote) {
+        signalMutation.mutate({
+          symbol: asset,
+          price: currentQuote.price,
+          changePct: currentQuote.changesPercentage,
+          news: (news || []).slice(0, 5).map((n) => ({
+            title: n.title,
+            text: n.text,
+            source: n.source,
+          })),
+          timeframe,
+        });
+      }
+    }
+  }, [streamError]);
+
   // 표시할 시그널 데이터 결정 (AI 결과 우선, 없으면 폴백)
-  const fallback = FALLBACK_SIGNALS[timeframe];
+  const fallback = getFallbackSignal(asset, timeframe);
   const isShortTerm = timeframe === '1min' || timeframe === '5min';
   const predictionType = getPredictionType(timeframe);
 
@@ -161,6 +222,9 @@ export default function SignalPanel() {
         model: aiResult.model || '',
       }
     : { ...fallback, reasoning: '', sources: [], model: '' };
+
+  // 스트리밍 중에는 thinkingText를 reasoning에 실시간 표시
+  const liveReasoning = isStreamLoading ? thinkingText : displaySignal.reasoning;
 
   return (
     <div className="flex h-full" style={{ background: '#0A0A0F' }}>
@@ -274,7 +338,7 @@ export default function SignalPanel() {
       >
         {/* 오른쪽 탭: AI시그널 | 매매히스토리 */}
         <div
-          className="flex shrink-0"
+          className="flex shrink-0 items-center"
           style={{ borderBottom: '1px solid #1A1A1A' }}
         >
           <button
@@ -299,6 +363,9 @@ export default function SignalPanel() {
             <History size={12} />
             매매 히스토리
           </button>
+          <span className="ml-auto pr-3">
+            <UserBadge role={userRole} size="sm" />
+          </span>
         </div>
 
         {/* AI 시그널 분석 생성 버튼 */}
@@ -306,21 +373,21 @@ export default function SignalPanel() {
           <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid #1A1A1A' }}>
             <button
               onClick={generateSignal}
-              disabled={signalMutation.isPending || !currentQuote}
+              disabled={isStreamLoading || signalMutation.isPending || !currentQuote}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[12px] font-bold cursor-pointer transition-all"
               style={{
-                background: signalMutation.isPending
+                background: (isStreamLoading || signalMutation.isPending)
                   ? '#1A1A1A'
                   : 'linear-gradient(135deg, #00FF41 0%, #00CC33 100%)',
-                color: signalMutation.isPending ? '#555' : '#000',
-                border: `1px solid ${signalMutation.isPending ? '#333' : 'rgba(0,255,65,0.3)'}`,
+                color: (isStreamLoading || signalMutation.isPending) ? '#555' : '#000',
+                border: `1px solid ${(isStreamLoading || signalMutation.isPending) ? '#333' : 'rgba(0,255,65,0.3)'}`,
                 opacity: !currentQuote ? 0.4 : 1,
               }}
             >
-              {signalMutation.isPending ? (
+              {(isStreamLoading || signalMutation.isPending) ? (
                 <>
                   <Loader2 size={14} className="animate-spin" />
-                  분석 중...
+                  {isStreamThinking ? 'AI가 분석하고 있습니다...' : '분석 중...'}
                 </>
               ) : (
                 <>
@@ -344,10 +411,37 @@ export default function SignalPanel() {
                 <span className="text-[10px]" style={{ color: '#555' }}>
                   {TIMEFRAMES.find((t) => t.id === timeframe)?.label}
                 </span>
-                {signalMutation.isPending && (
+                {(isStreamLoading || signalMutation.isPending) && (
                   <Loader2 size={12} className="animate-spin" style={{ color: '#00FF41' }} />
                 )}
               </div>
+
+              {/* Thinking Mode 로딩 오버레이 */}
+              {isStreamThinking && (
+                <div
+                  className="rounded-xl p-4"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0,180,216,0.05) 0%, rgba(0,255,65,0.03) 100%)',
+                    border: '1px solid rgba(0,180,216,0.2)',
+                  }}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Loader2 size={12} className="animate-spin" style={{ color: '#00B4D8' }} />
+                    <span
+                      className="text-[11px] font-bold animate-pulse"
+                      style={{ color: '#00B4D8' }}
+                    >
+                      AI가 분석하고 있습니다...
+                    </span>
+                  </div>
+                  <div className="h-0.5 w-full rounded-full overflow-hidden" style={{ background: 'rgba(0,180,216,0.1)' }}>
+                    <div
+                      className="h-full rounded-full animate-pulse"
+                      style={{ width: '60%', background: 'linear-gradient(90deg, #00B4D8, #00FF41, #00B4D8)' }}
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* 원형 확률 그래프 */}
               <ProbabilityDonut
@@ -398,8 +492,8 @@ export default function SignalPanel() {
                 </div>
               </div>
 
-              {/* Thinking Mode 추론 (Z.AI 확장) */}
-              {displaySignal.reasoning && (
+              {/* Thinking Mode 추론 (Z.AI 확장) — 라이브 스트리밍 + 완료 결과 */}
+              {(liveReasoning || isStreamThinking) && (
                 <div
                   className="rounded-xl p-3"
                   style={{ background: 'rgba(0,180,216,0.03)', border: '1px solid rgba(0,180,216,0.15)' }}
@@ -407,10 +501,17 @@ export default function SignalPanel() {
                   <div className="flex items-center gap-1.5 mb-2">
                     <Brain size={10} style={{ color: '#00B4D8' }} />
                     <span className="text-[10px] font-bold" style={{ color: '#00B4D8' }}>AI 추론 과정</span>
+                    {isStreamThinking && (
+                      <span className="text-[8px] animate-pulse" style={{ color: '#00B4D8' }}>
+                        ● LIVE
+                      </span>
+                    )}
                   </div>
-                  <p className="text-[10px] leading-relaxed" style={{ color: '#7CB9D4' }}>
-                    {displaySignal.reasoning.slice(0, 300)}
-                    {displaySignal.reasoning.length > 300 ? '...' : ''}
+                  <p className="text-[10px] leading-relaxed whitespace-pre-wrap" style={{ color: '#7CB9D4' }}>
+                    {liveReasoning || '분석을 시작하고 있습니다...'}
+                    {isStreamLoading && (
+                      <span className="inline-block w-1.5 h-3 ml-0.5 align-middle animate-pulse" style={{ background: '#00B4D8' }} />
+                    )}
                   </p>
                 </div>
               )}
