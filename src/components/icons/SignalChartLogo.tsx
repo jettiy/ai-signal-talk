@@ -3,22 +3,27 @@
 import React from 'react';
 
 interface SignalChartLogoProps {
-  size?: number;
+  iconSize?: number;
+  fontSize?: number;
   showText?: boolean;
   className?: string;
 }
 
 export default function SignalChartLogo({
-  size = 40,
+  iconSize = 40,
+  fontSize = 26,
   showText = false,
   className = '',
 }: SignalChartLogoProps) {
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div
+      className={`flex items-center ${className}`}
+      style={{ gap: 8 }}
+    >
       {/* Icon */}
       <svg
-        width={size}
-        height={size}
+        width={iconSize}
+        height={iconSize}
         viewBox="0 0 48 48"
         fill="none"
         xmlns="http://www.w3.org/2000/svg"
@@ -70,11 +75,11 @@ export default function SignalChartLogo({
       {/* Text */}
       {showText && (
         <span
-          className="whitespace-nowrap"
+          className="whitespace-nowrap select-none"
           style={{
             fontFamily: "'Space Grotesk', 'Pretendard', sans-serif",
             color: '#FFFFFF',
-            fontSize: size * 0.35,
+            fontSize,
             fontWeight: 500,
             letterSpacing: '-0.02em',
           }}

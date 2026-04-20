@@ -51,7 +51,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
-          <SignalChartLogo size={44} showText className="justify-center mb-3" />
+          <SignalChartLogo iconSize={44} fontSize={26} showText className="justify-center mb-3" />
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>실시간 투자 시그널과 트레이더 커뮤니티</p>
         </div>
 

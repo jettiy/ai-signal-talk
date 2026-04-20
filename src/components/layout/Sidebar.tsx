@@ -47,7 +47,7 @@ export default function Sidebar({ active, onNavigate, userRole }: SidebarProps) 
     >
       {/* 로고 */}
       <div className="mb-5">
-        <SignalChartLogo size={40} />
+        <SignalChartLogo iconSize={28} fontSize={20} />
       </div>
 
       {/* 네비게이션 */}

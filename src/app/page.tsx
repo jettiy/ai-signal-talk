@@ -54,7 +54,7 @@ export default function LandingPage() {
       <div className="w-full max-w-sm px-6">
         {/* 로고 */}
         <div className="flex justify-center mb-10">
-          <SignalChartLogo size={186} showText />
+          <SignalChartLogo iconSize={48} fontSize={32} showText />
         </div>
 
         {/* 로그인 카드 */}
