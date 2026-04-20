@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
+import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import Sidebar, { type NavId } from '@/components/layout/Sidebar';
 import TickerBar from '@/components/dashboard/TickerBar';
 import StatusBar from '@/components/dashboard/StatusBar';
@@ -87,7 +87,7 @@ export default function DashboardPage() {
             style={{ height: 48, background: '#0A0A0F', borderBottom: '1px solid #1A1A1A' }}
           >
             <div className="flex items-center gap-3">
-              <Image src="/logo.png" alt="AI 시그널톡" width={80} height={26} style={{ objectFit: 'contain' }} />
+              <SignalChartLogo iconSize={24} fontSize={18} showText />
               <span
                 className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"
                 style={{ background: 'rgba(0,255,65,0.1)', color: '#00FF41', border: '1px solid rgba(0,255,65,0.2)' }}
