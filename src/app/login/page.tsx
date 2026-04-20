@@ -50,14 +50,14 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <div className="flex items-center justify-center gap-2.5 mb-3">
+            <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
               <path d="M4 26L12 14L20 20L30 6" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M24 6L30 6L30 12" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round"/>
             </svg>
-            <span className="text-2xl font-black text-white tracking-tight">AI 시그널톡</span>
+            <span className="text-xl font-black text-white tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AI 시그널톡</span>
           </div>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>실시간 투자 시그널과 트레이더 커뮤니티</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>실시간 투자 시그널과 트레이더 커뮤니티</p>
         </div>
 
         {/* Card */}
@@ -81,7 +81,6 @@ export default function LoginPage() {
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="name@example.com"
-                  required
                   className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
                   style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                 />
@@ -99,7 +98,6 @@ export default function LoginPage() {
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   placeholder="password"
-                  required
                   className="w-full pl-9 pr-12 py-3 rounded-xl text-sm outline-none"
                   style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                 />

@@ -26,14 +26,16 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!id.trim()) { setError('이메일을 입력하세요.'); return; }
-    if (!nickname.trim()) { setError('닉네임을 입력하세요.'); return; }
+    setError('');
+
+    if (!id.trim()) { setError('이메일을 입력해주세요.'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id)) { setError('올바른 이메일 형식을 입력해주세요.'); return; }
+    if (!nickname.trim()) { setError('닉네임을 입력해주세요.'); return; }
     const err = validatePassword(password);
     if (err) { setPwError(err); return; }
     if (!agreed) { setError('이용약관에 동의해주세요.'); return; }
 
     setLoading(true);
-    setError('');
 
     try {
       const res = await fetch('/api/auth/register', {
@@ -64,14 +66,14 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-3 mb-3">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+          <div className="flex items-center justify-center gap-2.5 mb-3">
+            <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
               <path d="M4 26L12 14L20 20L30 6" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
               <path d="M24 6L30 6L30 12" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round"/>
             </svg>
-            <span className="text-2xl font-black text-white tracking-tight">AI 시그널톡</span>
+            <span className="text-xl font-black text-white tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AI 시그널톡</span>
           </div>
-          <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>실시간 투자 시그널과 트레이더 커뮤니티</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>실시간 투자 시그널과 트레이더 커뮤니티</p>
         </div>
 
         {/* Card */}
@@ -96,7 +98,6 @@ export default function SignupPage() {
                   value={id}
                   onChange={e => { setId(e.target.value); setError(''); }}
                   placeholder="name@example.com"
-                  required
                   className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
                   style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                 />
@@ -115,7 +116,6 @@ export default function SignupPage() {
                   value={nickname}
                   onChange={e => { setNickname(e.target.value); setError(''); }}
                   placeholder="Trader_X"
-                  required
                   className="w-full pl-9 pr-4 py-3 rounded-xl text-sm outline-none"
                   style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
                 />
@@ -146,19 +146,18 @@ export default function SignupPage() {
                   {showPw ? 'HIDE' : 'SHOW'}
                 </button>
               </div>
-              {/* 비밀번호 강도 */}
+              {/* 비밀번호 규칙 인디케이터 */}
               {password && (
-                <div className="mt-2 flex gap-1">
-                  {['length', 'alpha', 'num'].map((rule) => {
-                    const ok = rule === 'length' ? password.length >= 8
-                      : rule === 'alpha' ? /[a-zA-Z]/.test(password)
-                      : /[0-9]/.test(password);
-                    return (
-                      <div key={rule} className="flex items-center gap-1 text-xs" style={{ color: ok ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
-                        <span>{ok ? 'O' : 'O'}</span>
-                      </div>
-                    );
-                  })}
+                <div className="mt-2 flex gap-3">
+                  <div className="flex items-center gap-1 text-xs" style={{ color: password.length >= 8 ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
+                    <span style={{ color: password.length >= 8 ? '#00FF41' : '#555' }}>●</span> 8자 이상
+                  </div>
+                  <div className="flex items-center gap-1 text-xs" style={{ color: /[a-zA-Z]/.test(password) ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
+                    <span style={{ color: /[a-zA-Z]/.test(password) ? '#00FF41' : '#555' }}>●</span> 영문
+                  </div>
+                  <div className="flex items-center gap-1 text-xs" style={{ color: /[0-9]/.test(password) ? 'var(--accent-green)' : 'var(--text-secondary)' }}>
+                    <span style={{ color: /[0-9]/.test(password) ? '#00FF41' : '#555' }}>●</span> 숫자
+                  </div>
                 </div>
               )}
               {pwError && password && <p className="text-xs mt-1" style={{ color: 'var(--accent-red)' }}>{pwError}</p>}
@@ -201,8 +200,8 @@ export default function SignupPage() {
 
         {/* Footer */}
         <div className="flex items-center justify-center gap-6 mt-6">
-          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>ENCRYPTED</span>
-          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>SYSTEM STABLE</span>
+          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>🔒 ENCRYPTED</span>
+          <span className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>🟢 SYSTEM STABLE</span>
         </div>
       </div>
     </div>

@@ -4,11 +4,27 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ai-signal-ta
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, full_name } = await req.json();
+    const { email, password, nickname } = await req.json();
 
-    if (!email || !password || !full_name) {
+    if (!email || !password || !nickname) {
       return NextResponse.json(
-        { error: '모든 필드를 입력하세요.' },
+        { error: '모든 필드를 입력해주세요.' },
+        { status: 400 }
+      );
+    }
+
+    // 이메일 형식 검증
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json(
+        { error: '올바른 이메일 형식을 입력해주세요.' },
+        { status: 400 }
+      );
+    }
+
+    // 비밀번호 검증
+    if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
+      return NextResponse.json(
+        { error: '비밀번호는 영문+숫자 8자 이상이어야 합니다.' },
         { status: 400 }
       );
     }
@@ -17,7 +33,7 @@ export async function POST(req: NextRequest) {
     const res = await fetch(`${BACKEND_URL}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, nickname: full_name }),
+      body: JSON.stringify({ email, password, nickname }),
     });
 
     const data = await res.json();
