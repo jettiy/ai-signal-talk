@@ -1,34 +1,12 @@
 import Link from 'next/link';
+import SignalChartLogo from '@/components/icons/SignalChartLogo';
 
 export default function SignupSuccessPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'var(--bg-primary)' }}>
       <div className="w-full max-w-md text-center">
-        {/* Check Icon */}
-        <div className="flex items-center justify-center mb-8">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center"
-            style={{ background: 'rgba(0, 255, 65, 0.1)', border: '2px solid var(--accent-green)' }}
-          >
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <path
-                d="M10 20L17 27L30 13"
-                stroke="#00FF41"
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        {/* Title */}
-        <h1
-          className="text-3xl font-black text-white mb-2"
-          style={{ color: 'var(--accent-green)' }}
-        >
-          회원가입 완료
-        </h1>
+        {/* Logo */}
+        <SignalChartLogo iconSize={44} fontSize={26} showText className="justify-center mb-8" />
         <p className="text-sm mb-10" style={{ color: 'var(--text-secondary)' }}>
           AI 시그널톡에 오신 것을 환영합니다.<br />지금 바로 터미널에 접속하세요.
         </p>
