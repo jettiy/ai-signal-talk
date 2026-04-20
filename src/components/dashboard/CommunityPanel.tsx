@@ -276,6 +276,8 @@ export default function CommunityPanel() {
   const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  // ── AI 시그널 결과 (버튼 클릭 시 저장) ──
+  const [signalResult, setSignalResult] = useState<{ entryPrice?: number; targetPrice?: number; stopLoss?: number; confidence?: number; signalType?: string } | null>(null);
 
   // ── 실시간 시세 데이터 ──
   const { data: allQuotes } = useMarketData();
@@ -737,7 +739,7 @@ export default function CommunityPanel() {
             {liveAssets.map((asset) => (
               <button
                 key={asset.id}
-                onClick={() => setActiveMiniAsset(asset.id)}
+                onClick={() => { setActiveMiniAsset(asset.id); setSignalResult(null); }}
                 className="flex-1 text-[8px] font-bold px-1.5 py-1.5 rounded-lg cursor-pointer transition-all"
                 style={{
                   background: activeMiniAsset === asset.id ? 'rgba(0,255,65,0.1)' : '#111118',
@@ -780,20 +782,26 @@ export default function CommunityPanel() {
         >
           <div className="flex items-center gap-4">
             {/* 원형 신뢰도 게이지 */}
-            <ConfidenceGauge value={76} size={80} />
+            <ConfidenceGauge value={signalResult?.confidence ?? 76} size={80} />
 
-            {/* 진입가 / 목표가 */}
+            {/* 진입가 / 목표가 / 손절가 */}
             <div className="flex-1 space-y-2">
               <div>
                 <span className="text-[8px] font-bold block" style={{ color: '#555' }}>ENTRY PRICE</span>
                 <span className="text-sm font-black font-mono text-white">
-                  {activeMiniAsset === 'NQUSD' ? '21,210.50' : activeMiniAsset === 'GCUSD' ? '4,810.20' : '64.50'}
+                  {signalResult?.entryPrice?.toLocaleString() ?? '-'}
                 </span>
               </div>
               <div>
                 <span className="text-[8px] font-bold block" style={{ color: '#555' }}>TARGET</span>
                 <span className="text-sm font-black font-mono" style={{ color: '#00FF41' }}>
-                  {activeMiniAsset === 'NQUSD' ? '21,450.00' : activeMiniAsset === 'GCUSD' ? '4,880.00' : '66.20'}
+                  {signalResult?.targetPrice?.toLocaleString() ?? '-'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[8px] font-bold block" style={{ color: '#555' }}>STOP LOSS</span>
+                <span className="text-sm font-black font-mono" style={{ color: '#FF3B3B' }}>
+                  {signalResult?.stopLoss?.toLocaleString() ?? '-'}
                 </span>
               </div>
             </div>
@@ -804,13 +812,13 @@ export default function CommunityPanel() {
             <span
               className="text-[9px] font-bold px-2 py-1 rounded"
               style={{
-                background: currentAsset.dir === 'buy' ? 'rgba(0,255,65,0.1)' : 'rgba(255,59,59,0.1)',
-                color: currentAsset.dir === 'buy' ? '#00FF41' : '#FF3B3B',
+                background: (signalResult?.signalType === 'LONG' ? true : currentAsset.dir === 'buy') ? 'rgba(0,255,65,0.1)' : 'rgba(255,59,59,0.1)',
+                color: (signalResult?.signalType === 'LONG' ? true : currentAsset.dir === 'buy') ? '#00FF41' : '#FF3B3B',
               }}
             >
-              {currentAsset.dir === 'buy' ? '매수' : '매도'} 시그널
+              {signalResult?.signalType === 'LONG' ? '매수' : signalResult?.signalType === 'SHORT' ? '매도' : currentAsset.dir === 'buy' ? '매수' : '매도'} 시그널
             </span>
-            <span className="text-[9px]" style={{ color: '#444' }}>5분봉 기준</span>
+            <span className="text-[9px]" style={{ color: '#444' }}>{activeTimeframe} 기준</span>
           </div>
         </div>
 
@@ -818,11 +826,13 @@ export default function CommunityPanel() {
         <div className="flex-1 px-4 py-3 overflow-y-auto min-h-0">
           <span className="text-[9px] font-bold block mb-1.5" style={{ color: '#555' }}>시장 분석 요약</span>
           <p className="text-[10px] leading-relaxed" style={{ color: '#888' }}>
-            {activeMiniAsset === 'NQUSD'
-              ? '나스닥 선물 상승 모멘텀 유지. 21,280 지지 확인 후 반등 패턴 진행 중. RSI 58로 중립권 진입, 추가 상승 시 21,450 도달 가능.'
+            {signalResult?.confidence
+              ? `${currentAsset.label} AI 시그널 분석 완료. 신뢰도 ${signalResult.confidence}%. 진입가 ${signalResult.entryPrice?.toLocaleString() ?? '-'} → 목표가 ${signalResult.targetPrice?.toLocaleString() ?? '-'}`
+              : activeMiniAsset === 'NQUSD'
+              ? '나스닥(QQQ) 상승 모멘텀 유지. RSI 58 중립권, 추가 상승 시 돌파 가능. AI 분석 버튼으로 상세 시그널을 확인하세요.'
               : activeMiniAsset === 'GCUSD'
-              ? '골드 강세 지속. 중앙은행 매수세 + 지정학 리스크로 사상 최고치 경신 중. 4,800 돌파 후 4,880 목표가 가능.'
-              : 'WTI 단기 조정 후 $65 회복. OPEC+ 감산 연장 호재, 단기 매수 관점. $66.20 도달 시 부분 익절 권장.'}
+              ? '골드(GLD) 강세 지속. 중앙은행 매수세 + 지정학 리스크 수혜. AI 분석으로 진입가/목표가를 확인하세요.'
+              : 'WTI(USO) 단기 조정 후 반등. OPEC+ 감산 연장 호재. AI 분석으로 매수/매도 시그널을 확인하세요.'}
           </p>
         </div>
 
@@ -847,6 +857,13 @@ export default function CommunityPanel() {
                 if (res.ok) {
                   const data = await res.json();
                   const direction = data.signalType === 'LONG' ? '매수' : '매도';
+                  setSignalResult({
+                    entryPrice: data.entryPrice,
+                    targetPrice: data.targetPrice,
+                    stopLoss: data.stopLoss,
+                    confidence: data.confidence,
+                    signalType: data.signalType,
+                  });
                   const msg = `🤖 AI 시그널: ${currentAsset.label} ${direction} | 진입가 ${data.entryPrice || '-'} | TP ${data.targetPrice || '-'} | SL ${data.stopLoss || '-'} | 신뢰도 ${data.confidence || '-'}%`;
                   setChatMessages(prev => [...prev, {
                     id: Date.now(),
