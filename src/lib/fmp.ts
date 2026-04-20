@@ -12,7 +12,7 @@ const TD_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
 // ─── 심볼 매핑: 우리 내부 심볼 ↔ 각 API 심볼 ───
 const INTERNAL_TO_FMP: Record<string, string> = {
-  NQUSD: 'NQUSD', GCUSD: 'GCUSD', CLUSD: 'CLUSD',
+  NQUSD: 'QQQ', GCUSD: 'GLD', CLUSD: 'USO',
   AAPL: 'AAPL', NVDA: 'NVDA', TSLA: 'TSLA',
   META: 'META', MSFT: 'MSFT', AMZN: 'AMZN', SPY: 'SPY', QQQ: 'QQQ',
 };
