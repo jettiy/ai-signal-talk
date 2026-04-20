@@ -12,6 +12,8 @@ import {
   Time,
   CandlestickSeries,
 } from 'lightweight-charts';
+import { useMarketData } from '@/hooks/useMarketData';
+import { useChartData } from '@/hooks/useChartData';
 
 // ── 등급 스타일 ────────────────────────────────────────────────
 const GRADE_STYLES: Record<string, { color: string; bg: string }> = {
@@ -65,9 +67,9 @@ const IMPACT_MAP = {
 
 // ── 미니차트 종목 ──────────────────────────────────────────────
 const MINI_CHART_ASSETS = [
-  { id: 'NQUSD', label: '나스닥선물', price: '21,285.50', change: '+0.42', dir: 'buy' as const },
-  { id: 'GCUSD', label: '골드선물', price: '4,821.30', change: '+1.18', dir: 'buy' as const },
-  { id: 'CLUSD', label: 'WTI원유', price: '64.80', change: '-0.35', dir: 'sell' as const },
+  { id: 'NQUSD', label: '나스닥(QQQ)', price: '21,285.50', change: '+0.42', dir: 'buy' as const },
+  { id: 'GCUSD', label: '골드(GLD)', price: '4,821.30', change: '+1.18', dir: 'buy' as const },
+  { id: 'CLUSD', label: 'WTI(USO)', price: '64.80', change: '-0.35', dir: 'sell' as const },
 ];
 
 // ── 시간프레임 ──────────────────────────────────────────────
@@ -85,7 +87,7 @@ const MENTION_OPTIONS = [
   { key: '뉴스', desc: '뉴스 봇 (최신 뉴스 요약)', emoji: '📰' },
 ];
 
-// ── 미니차트 Mock 데이터 ────────────────────────────────────
+// ── 미니차트 Mock 데이터 (API 로딩 전 폴백) ────────────────────────────
 function generateMiniCandleData(basePrice: number, volatility: number): CandlestickData[] {
   const data: CandlestickData[] = [];
   let price = basePrice;
@@ -109,7 +111,7 @@ function generateMiniCandleData(basePrice: number, volatility: number): Candlest
   return data;
 }
 
-const MINI_CHART_DATA: Record<string, CandlestickData[]> = {
+const FALLBACK_CHART_DATA: Record<string, CandlestickData[]> = {
   NQUSD: generateMiniCandleData(21285, 15),
   GCUSD: generateMiniCandleData(4821, 8),
   CLUSD: generateMiniCandleData(64.8, 0.3),
@@ -167,10 +169,21 @@ function ConfidenceGauge({ value, size = 80 }: { value: number; size?: number })
   );
 }
 
-// ── 미니 캔들차트 ────────────────────────────────────────
-function MiniCandleChart({ symbol }: { symbol: string }) {
+// ── 미니 캔들차트 (API 데이터 연동) ────────────────────────────────
+function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: any[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+
+  // chartData가 있으면 실제 데이터 사용, 없으면 폴백
+  const displayData = chartData && chartData.length > 0
+    ? chartData.map(d => ({
+        time: Math.floor(d.timestamp / 1000) as Time,
+        open: d.open,
+        high: d.high,
+        low: d.low,
+        close: d.close,
+      }))
+    : (FALLBACK_CHART_DATA[symbol] || FALLBACK_CHART_DATA.GCUSD);
 
   const initChart = useCallback(() => {
     if (!containerRef.current) return;
@@ -180,7 +193,7 @@ function MiniCandleChart({ symbol }: { symbol: string }) {
     }
 
     const container = containerRef.current;
-    const data = MINI_CHART_DATA[symbol] || MINI_CHART_DATA.GCUSD;
+    const data = FALLBACK_CHART_DATA[symbol] || FALLBACK_CHART_DATA.GCUSD;
 
     const chart = createChart(container, {
       width: container.clientWidth,
@@ -219,7 +232,7 @@ function MiniCandleChart({ symbol }: { symbol: string }) {
       wickDownColor: '#FF3B3B80',
     });
 
-    candleSeries.setData(data);
+    candleSeries.setData(displayData);
     chart.timeScale().fitContent();
     chartRef.current = chart;
 
@@ -239,7 +252,7 @@ function MiniCandleChart({ symbol }: { symbol: string }) {
       observer.disconnect();
       chart.remove();
     };
-  }, [symbol]);
+  }, [symbol, displayData]);
 
   useEffect(() => {
     const cleanup = initChart();
@@ -263,6 +276,24 @@ export default function CommunityPanel() {
   const [mentionDropdownOpen, setMentionDropdownOpen] = useState(false);
   const [mentionIndex, setMentionIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── 실시간 시세 데이터 ──
+  const { data: allQuotes } = useMarketData();
+  const nqQuote = allQuotes?.find(q => q.symbol === 'NQUSD');
+  const gcQuote = allQuotes?.find(q => q.symbol === 'GCUSD');
+  const clQuote = allQuotes?.find(q => q.symbol === 'CLUSD');
+
+  // ── 차트 데이터 ──
+  const { data: miniChartData } = useChartData(activeMiniAsset, activeTimeframe);
+
+  // 실시간 시세로 MINI_CHART_ASSETS 업데이트
+  const liveAssets = [
+    { id: 'NQUSD' as const, label: '나스닥(QQQ)', price: nqQuote ? nqQuote.price.toLocaleString() : MINI_CHART_ASSETS[0].price, change: nqQuote ? nqQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[0].change, dir: ((nqQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
+    { id: 'GCUSD' as const, label: '골드(GLD)', price: gcQuote ? gcQuote.price.toLocaleString() : MINI_CHART_ASSETS[1].price, change: gcQuote ? gcQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[1].change, dir: ((gcQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
+    { id: 'CLUSD' as const, label: 'WTI(USO)', price: clQuote ? clQuote.price.toLocaleString() : MINI_CHART_ASSETS[2].price, change: clQuote ? clQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[2].change, dir: ((clQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
+  ];
+
+  const activeLiveAsset = liveAssets.find(a => a.id === activeMiniAsset) || liveAssets[0];
 
   const filteredMessages = activeChannel === 'general'
     ? chatMessages
@@ -462,7 +493,7 @@ export default function CommunityPanel() {
     setAiLoading(false);
   };
 
-  const currentAsset = MINI_CHART_ASSETS.find((a) => a.id === activeMiniAsset) || MINI_CHART_ASSETS[0];
+  const currentAsset = liveAssets.find((a) => a.id === activeMiniAsset) || liveAssets[0];
 
   return (
     <div className="flex h-full">
@@ -703,7 +734,7 @@ export default function CommunityPanel() {
         <div className="px-4 py-2.5 shrink-0 flex flex-col gap-2" style={{ borderBottom: '1px solid #1A1A1A' }}>
           {/* 종목 탭 */}
           <div className="flex gap-1">
-            {MINI_CHART_ASSETS.map((asset) => (
+            {liveAssets.map((asset) => (
               <button
                 key={asset.id}
                 onClick={() => setActiveMiniAsset(asset.id)}
@@ -739,7 +770,7 @@ export default function CommunityPanel() {
 
         {/* 미니 캔들차트 */}
         <div className="shrink-0 px-2" style={{ height: 160 }}>
-          <MiniCandleChart symbol={activeMiniAsset} />
+          <MiniCandleChart symbol={activeMiniAsset} chartData={miniChartData} />
         </div>
 
         {/* 신뢰도 게이지 + 진입가/목표가 */}
@@ -802,21 +833,21 @@ export default function CommunityPanel() {
               if (signalLoading) return;
               setSignalLoading(true);
               try {
-                const assetInfo = MINI_CHART_ASSETS.find(a => a.id === activeMiniAsset);
+                const liveQuote = allQuotes?.find(q => q.symbol === activeMiniAsset);
                 const res = await fetch('/api/ai-signal', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     symbol: activeMiniAsset,
-                    price: parseFloat(assetInfo?.price || '0'),
-                    changePct: parseFloat(assetInfo?.change || '0'),
+                    price: liveQuote?.price || 0,
+                    changePct: liveQuote?.changesPercentage || 0,
                     timeframe: activeTimeframe,
                   }),
                 });
                 if (res.ok) {
                   const data = await res.json();
                   const direction = data.signalType === 'LONG' ? '매수' : '매도';
-                  const msg = `🤖 AI 시그널: ${assetInfo?.label || activeMiniAsset} ${direction} | 진입가 ${data.entryPrice || '-'} | TP ${data.targetPrice || '-'} | SL ${data.stopLoss || '-'} | 신뢰도 ${data.confidence || '-'}%`;
+                  const msg = `🤖 AI 시그널: ${currentAsset.label} ${direction} | 진입가 ${data.entryPrice || '-'} | TP ${data.targetPrice || '-'} | SL ${data.stopLoss || '-'} | 신뢰도 ${data.confidence || '-'}%`;
                   setChatMessages(prev => [...prev, {
                     id: Date.now(),
                     grade: 'BOT',

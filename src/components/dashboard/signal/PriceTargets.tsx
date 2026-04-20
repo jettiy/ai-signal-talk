@@ -8,10 +8,15 @@ interface Props {
   stopLoss: string;
   takeProfit: string;
   riskReward: string;
+  symbol?: string;
+  etf?: string;
+  currentPrice?: number;
 }
 
-export default function PriceTargets({ direction, entry, stopLoss, takeProfit, riskReward }: Props) {
+export default function PriceTargets({ direction, entry, stopLoss, takeProfit, riskReward, symbol, etf, currentPrice }: Props) {
   const isBuy = direction === 'buy';
+
+  const fmtPrice = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   const items = [
     {
@@ -21,13 +26,13 @@ export default function PriceTargets({ direction, entry, stopLoss, takeProfit, r
       color: '#FFFFFF',
     },
     {
-      label: '손절가',
+      label: isBuy ? '손절가 (매도)' : '손절가 (매수)',
       value: `$${stopLoss}`,
       icon: ShieldAlert,
       color: '#FF3B3B',
     },
     {
-      label: '목표가',
+      label: isBuy ? '목표가 (매도)' : '목표가 (매수)',
       value: `$${takeProfit}`,
       icon: TrendingUp,
       color: '#00FF41',
@@ -39,17 +44,29 @@ export default function PriceTargets({ direction, entry, stopLoss, takeProfit, r
       className="rounded-xl p-3"
       style={{ background: '#111118', border: '1px solid #1A1A1A' }}
     >
-      {/* 방향 헤더 */}
-      <div className="flex items-center gap-2 mb-3">
-        <span
-          className="text-[10px] font-bold px-2 py-0.5 rounded"
-          style={{
-            background: isBuy ? 'rgba(0,255,65,0.1)' : 'rgba(255,59,59,0.1)',
-            color: isBuy ? '#00FF41' : '#FF3B3B',
-          }}
-        >
-          {isBuy ? '매수' : '매도'}
-        </span>
+      {/* 방향 헤더 + ETF 현재가 */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded"
+            style={{
+              background: isBuy ? 'rgba(0,255,65,0.1)' : 'rgba(255,59,59,0.1)',
+              color: isBuy ? '#00FF41' : '#FF3B3B',
+            }}
+          >
+            {isBuy ? 'LONG (매수)' : 'SHORT (매도)'}
+          </span>
+          {etf && (
+            <span className="text-[10px] font-mono font-bold" style={{ color: '#888' }}>
+              {etf}
+            </span>
+          )}
+        </div>
+        {currentPrice != null && (
+          <span className="text-[10px] font-mono" style={{ color: '#FFD700' }}>
+            현재가 ${fmtPrice(currentPrice)}
+          </span>
+        )}
       </div>
 
       {/* 가격 정보 */}

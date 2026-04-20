@@ -5,6 +5,13 @@
 
 import { AiSignalResult, WebSearchResult, getPredictionType } from './types';
 
+// ETF 심볼 매핑 (AI 프롬프트에서 ETF 이름 표시용)
+const ETF_MAP: Record<string, string> = {
+  NQUSD: 'QQQ',
+  GCUSD: 'GLD',
+  CLUSD: 'USO',
+};
+
 // ===== API Keys =====
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY || '';
 const ZAI_API_KEY = process.env.ZAI_API_KEY || '';
@@ -64,7 +71,7 @@ function buildUserPrompt(
 
   const predictionType = getPredictionType(timeframe);
 
-  return `종목: ${symbol}
+  return `종목: ${symbol} (ETF: ${ETF_MAP[symbol] || symbol})
 현재가: $${price}
 전일 대비: ${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%
 시간프레임: ${timeframe}
@@ -73,7 +80,7 @@ function buildUserPrompt(
 최근 뉴스:
 ${newsSection || '최근 주요 뉴스 없음'}${webSection}
 
-위 데이터를 종합 분석해서 매매 시그널을 생성해.`;
+위 데이터를 종합 분석해서 매매 시그널을 생성해. 가격은 ETF 실제 가격($${price}) 기준으로 entryPrice, stopLoss, targetPrice를 설정해.`;
 }
 
 // ===== 1순위: DeepSeek V3.2 (속도 우선) =====

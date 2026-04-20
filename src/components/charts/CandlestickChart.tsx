@@ -9,6 +9,7 @@ import {
   Time,
   CandlestickSeries,
   HistogramSeries,
+  IPriceLine,
 } from 'lightweight-charts';
 
 interface SignalOverlay {
@@ -31,11 +32,23 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
   const dataRef = useRef(data);
   const volumeDataRef = useRef(volumeData);
   const signalRef = useRef(signal);
+  // price line 추적 — 새 시그널 시 기존 라인 제거용
+  const priceLinesRef = useRef<IPriceLine[]>([]);
 
   // 최신 props를 ref에 유지
   dataRef.current = data;
   volumeDataRef.current = volumeData;
   signalRef.current = signal;
+
+  // 기존 price lines 전부 제거
+  const clearPriceLines = useCallback(() => {
+    const series = candleSeriesRef.current;
+    if (!series) return;
+    for (const line of priceLinesRef.current) {
+      try { series.removePriceLine(line); } catch {}
+    }
+    priceLinesRef.current = [];
+  }, []);
 
   // 차트 초기화 (한 번만)
   const initChart = useCallback(() => {
@@ -122,7 +135,7 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
     };
   }, []); // 마운트 시 한 번만
 
-  // 데이터/시그널 업데이트 (차트 재생성 없이)
+  // 데이터 업데이트 (시그널 변경 시에도 호출)
   useEffect(() => {
     const series = candleSeriesRef.current;
     if (!series || !dataRef.current || dataRef.current.length === 0) return;
@@ -130,12 +143,15 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
     try {
       series.setData(dataRef.current);
 
-      // 기존 price lines 제거 후 재생성
-      // (v5에서는 createPriceLine이 매번 새로 만듦)
-      // 진입가 라인
+      // 항상 기존 price lines 먼저 제거
+      clearPriceLines();
+
+      // 새 시그널이 있으면 한 세트만 생성
       if (signalRef.current) {
-        series.createPriceLine({
-          price: signalRef.current.entryPrice,
+        const sig = signalRef.current;
+
+        const entryLine = series.createPriceLine({
+          price: sig.entryPrice,
           color: '#FFFFFF',
           lineWidth: 1,
           lineStyle: 2,
@@ -143,9 +159,8 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
           title: '진입가',
         });
 
-        // 목표가 라인
-        series.createPriceLine({
-          price: signalRef.current.targetPrice,
+        const targetLine = series.createPriceLine({
+          price: sig.targetPrice,
           color: '#00FF41',
           lineWidth: 1,
           lineStyle: 0,
@@ -153,23 +168,23 @@ export default function CandlestickChart({ data, volumeData, signal }: Props) {
           title: '목표가',
         });
 
-        // 손절가 라인
-        series.createPriceLine({
-          price: signalRef.current.stopLoss,
+        const stopLine = series.createPriceLine({
+          price: sig.stopLoss,
           color: '#FF3B3B',
           lineWidth: 1,
           lineStyle: 0,
           axisLabelVisible: true,
           title: '손절가',
         });
+
+        priceLinesRef.current = [entryLine, targetLine, stopLine];
       }
 
       chartRef.current?.timeScale().fitContent();
     } catch (e) {
-      // "Object is disposed" 등 무시
       console.warn('Chart update error:', (e as Error).message);
     }
-  }, [data, signal]);
+  }, [data, signal, clearPriceLines]);
 
   useEffect(() => {
     const cleanup = initChart();

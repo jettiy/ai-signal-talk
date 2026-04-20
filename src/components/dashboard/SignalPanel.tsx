@@ -35,27 +35,38 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
-  { id: 'NQUSD', label: '나스닥(QQQ)' },
-  { id: 'GCUSD', label: '골드(GLD)' },
-  { id: 'CLUSD', label: 'WTI(USO)' },
+  { id: 'NQUSD', label: '나스닥(QQQ)', etf: 'QQQ' },
+  { id: 'GCUSD', label: '골드(GLD)', etf: 'GLD' },
+  { id: 'CLUSD', label: 'WTI(USO)', etf: 'USO' },
 ] as const;
 
-// ── Fallback Mock (API 응답 없을 때) ──────────────────────────
-// 종목별 가격 기준 설정
-const FALLBACK_BASE_PRICES: Record<string, { price: number; unit: number; stopUnit: number }> = {
-  NQUSD: { price: 21285, unit: 10, stopUnit: 35 },
-  GCUSD: { price: 4810, unit: 3, stopUnit: 15 },
-  CLUSD: { price: 64.8, unit: 0.2, stopUnit: 0.8 },
+// ── 종목별 가격 포맷 & 단위 설정 ────────────────────────────────
+const ASSET_CONFIG: Record<string, { decimals: number; stopPct: number; targetPct: number }> = {
+  NQUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.2 },  // QQQ $500 → stop $497.5, target $506
+  GCUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },  // GLD $300 → stop $298.5, target $303
+  CLUSD: { decimals: 2, stopPct: 0.8, targetPct: 2.0 },  // USO $55 → stop $54.5, target $56.1
 };
 
-// 종목별·시간프레임별 폴백 시그널 생성 함수
-function getFallbackSignal(asset: string, tf: TimeframeId) {
-  const base = FALLBACK_BASE_PRICES[asset] || FALLBACK_BASE_PRICES['NQUSD'];
-  const p = base.price;
-  const u = base.unit;
-  const su = base.stopUnit;
+// ETF 심볼 매핑 (AI 프롬프트 + UI 표시용)
+const ETF_MAP: Record<string, string> = {
+  NQUSD: 'QQQ',
+  GCUSD: 'GLD',
+  CLUSD: 'USO',
+};
 
-  const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: asset === 'CLUSD' ? 2 : 0, maximumFractionDigits: asset === 'CLUSD' ? 2 : 0 });
+// 실시간 가격 기반 폴백 시그널 생성
+function getFallbackSignal(asset: string, tf: TimeframeId, livePrice?: number) {
+  const cfg = ASSET_CONFIG[asset] || ASSET_CONFIG['NQUSD'];
+  const p = livePrice || 100; // 실시간 가격 없으면 안전 기본값
+  const etf = ETF_MAP[asset] || asset;
+
+  const fmt = (n: number) => n.toLocaleString('en-US', {
+    minimumFractionDigits: cfg.decimals,
+    maximumFractionDigits: cfg.decimals,
+  });
+
+  const stopMul = cfg.stopPct / 100;
+  const targetMul = cfg.targetPct / 100;
 
   const signals: Record<TimeframeId, {
     direction: 'buy' | 'sell';
@@ -71,45 +82,45 @@ function getFallbackSignal(asset: string, tf: TimeframeId) {
   }> = {
     '1min': {
       direction: 'buy', buyProb: 62, sellProb: 38,
-      entry: fmt(p), stopLoss: fmt(p - u), takeProfit: fmt(p + 2.5 * u),
+      entry: fmt(p), stopLoss: fmt(p * (1 - stopMul * 0.3)), takeProfit: fmt(p * (1 + targetMul * 0.4)),
       riskReward: '2.5', confidence: 58,
       predictionType: '다음 봉 예측',
-      rationale: '1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지.',
+      rationale: `${etf} 1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지.`,
     },
     '5min': {
       direction: 'sell', buyProb: 35, sellProb: 65,
-      entry: fmt(p + 0.5 * u), stopLoss: fmt(p + 2 * u), takeProfit: fmt(p - 5 * u),
+      entry: fmt(p * 1.001), stopLoss: fmt(p * (1 + stopMul * 0.5)), takeProfit: fmt(p * (1 - targetMul * 0.6)),
       riskReward: '2.5', confidence: 65,
       predictionType: '다음 봉 예측',
-      rationale: '5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환.',
+      rationale: `${etf} 5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환.`,
     },
     '15min': {
       direction: 'buy', buyProb: 71, sellProb: 29,
-      entry: fmt(p - 0.5 * u), stopLoss: fmt(p - su), takeProfit: fmt(p + 3.5 * u * 2),
+      entry: fmt(p * 0.999), stopLoss: fmt(p * (1 - stopMul)), takeProfit: fmt(p * (1 + targetMul)),
       riskReward: '2.3', confidence: 71,
       predictionType: '현재봉 마감',
-      rationale: '15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생.',
+      rationale: `${etf} 15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생.`,
     },
     '30min': {
       direction: 'buy', buyProb: 58, sellProb: 42,
-      entry: fmt(p - u), stopLoss: fmt(p - su), takeProfit: fmt(p + 3.4 * u),
+      entry: fmt(p), stopLoss: fmt(p * (1 - stopMul * 1.2)), takeProfit: fmt(p * (1 + targetMul * 1.1)),
       riskReward: '1.86', confidence: 58,
       predictionType: '현재봉 마감',
-      rationale: '30분봉 EMA50 지지선 테스트 중. 매수세 유입 확인.',
+      rationale: `${etf} 30분봉 EMA50 지지선 테스트 중. 매수세 유입 확인.`,
     },
     '1hour': {
       direction: 'sell', buyProb: 40, sellProb: 60,
-      entry: fmt(p + u), stopLoss: fmt(p + 4.5 * u), takeProfit: fmt(p - 6.3 * u),
+      entry: fmt(p * 1.002), stopLoss: fmt(p * (1 + stopMul * 1.5)), takeProfit: fmt(p * (1 - targetMul * 1.5)),
       riskReward: '2.1', confidence: 60,
       predictionType: '현재봉 마감',
-      rationale: '1시간봉 더블탑 패턴 완성. RSI 70 과매수.',
+      rationale: `${etf} 1시간봉 더블탑 패턴 완성. RSI 70 과매수.`,
     },
     '1day': {
       direction: 'buy', buyProb: 74, sellProb: 26,
-      entry: fmt(p - 1.5 * u), stopLoss: fmt(p - su * 5), takeProfit: fmt(p + su * 9),
+      entry: fmt(p * 0.998), stopLoss: fmt(p * (1 - stopMul * 3)), takeProfit: fmt(p * (1 + targetMul * 3)),
       riskReward: '1.94', confidence: 74,
       predictionType: '현재봉 마감',
-      rationale: '일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항.',
+      rationale: `${etf} 일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항.`,
     },
   };
 
@@ -148,11 +159,20 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
     reset: resetStream,
   } = useAiSignalStream();
 
-  // 시그널 수동 생성 — 스트리밍 모드 우선
+  // ★ 종목/시간프레임 변경 시 이전 AI 결과 초기화 (차트 시그널도 함께 제거됨)
+  useEffect(() => {
+    setAiResult(null);
+    resetStream();
+  }, [asset, timeframe, resetStream]);
+
+  // 시그널 수동 생성 — 오직 버튼 클릭으로만 실행
   const generateSignal = useCallback(() => {
     if (!currentQuote) return;
 
-    // 스트리밍 모드로 시작
+    // 이전 결과 초기화 후 새 분석 시작
+    setAiResult(null);
+    resetStream();
+
     startStream({
       symbol: asset,
       price: currentQuote.price,
@@ -164,7 +184,7 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
       })),
       timeframe,
     });
-  }, [asset, timeframe, currentQuote, news, startStream]);
+  }, [asset, timeframe, currentQuote, news, startStream, resetStream]);
 
   // 스트리밍 완료 시 AI 결과 업데이트
   useEffect(() => {
@@ -200,8 +220,9 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
     }
   }, [streamError]);
 
-  // 표시할 시그널 데이터 결정 (AI 결과 우선, 없으면 폴백)
-  const fallback = getFallbackSignal(asset, timeframe);
+  // 표시할 시그널 데이터 결정 (AI 결과 우선, 없으면 실시간 가격 기반 폴백)
+  const livePrice = currentQuote?.price;
+  const fallback = getFallbackSignal(asset, timeframe, livePrice);
   const isShortTerm = timeframe === '1min' || timeframe === '5min';
   const predictionType = getPredictionType(timeframe);
 
@@ -458,6 +479,8 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
                 stopLoss={displaySignal.stopLoss}
                 takeProfit={displaySignal.takeProfit}
                 riskReward={displaySignal.riskReward}
+                etf={ETF_MAP[asset]}
+                currentPrice={currentQuote?.price}
               />
 
               {/* 신뢰도 */}
