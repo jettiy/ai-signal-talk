@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import {
   MessageCircle,
@@ -39,6 +40,17 @@ function getNavItems(role: UserRole) {
 
 export default function Sidebar({ active, onNavigate, userRole }: SidebarProps) {
   const navItems = getNavItems(userRole);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (userRole !== 'ADMIN') return;
+    const handler = (e: Event) => {
+      const count = (e as CustomEvent).detail;
+      if (typeof count === 'number') setPendingCount(count);
+    };
+    window.addEventListener('admin-pending-update', handler);
+    return () => window.removeEventListener('admin-pending-update', handler);
+  }, [userRole]);
 
   return (
     <aside
@@ -82,7 +94,17 @@ export default function Sidebar({ active, onNavigate, userRole }: SidebarProps) 
             }}
             title={label}
           >
-            <Icon className="w-5 h-5" />
+            <div className="relative">
+              <Icon className="w-5 h-5" />
+              {id === 'admin' && pendingCount > 0 && (
+                <span
+                  className="absolute -top-1.5 -right-2.5 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold"
+                  style={{ background: '#FF3B3B', color: '#FFF' }}
+                >
+                  {pendingCount > 9 ? '9+' : pendingCount}
+                </span>
+              )}
+            </div>
             <span className={`text-[9px] font-bold ${isSpecialTab ? 'tracking-wide' : ''}`}>
               {label}
             </span>

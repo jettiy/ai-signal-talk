@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Users,
   UserCheck,
@@ -27,25 +28,34 @@ import {
 import Sidebar from '@/components/layout/Sidebar';
 import TickerBar from '@/components/dashboard/TickerBar';
 
-/* ── Mock 데이터 (API 미구현 부분만 유지) ─────────────── */
+/* ── 타입 ───────────────────────────────────────────── */
 
-// 사용자 증가 추이 (최근 30일) — 백엔드에 daily stats API 없음
-const MOCK_GROWTH = Array.from({ length: 30 }, (_, i) => {
-  const d = new Date();
-  d.setDate(d.getDate() - (29 - i));
-  return {
-    date: `${d.getMonth() + 1}/${d.getDate()}`,
-    users: Math.floor(Math.random() * 20) + 5,
-  };
-});
+interface Consultation {
+  id: number;
+  user_id: number;
+  nickname: string;
+  email: string;
+  title: string;
+  last_message: string;
+  message_count: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
 
-// 상담 대기열 — 백엔드 conversations API 별도 작업 예정
-const MOCK_CONSULT_QUEUE = [
-  { id: 'c1', name: '김준석', message: 'PRO 전환 문의드립니다.', time: '23:45', status: 'waiting' },
-  { id: 'c2', name: '이하늘', message: 'PRO 혜택이 어떻게 되나요?', time: '00:13', status: 'in_progress' },
-  { id: 'c3', name: '박미래', message: '1:1 트레이더 배정은 언제 되나요?', time: '00:30', status: 'waiting' },
-  { id: 'c4', name: '정태양', message: '결제 오류가 발생했습니다.', time: '01:02', status: 'waiting' },
-];
+interface ConsultationsResponse {
+  consultations: Consultation[];
+  pending_count: number;
+}
+
+interface DailySignup {
+  date: string;
+  count: number;
+}
+
+interface DailySignupsResponse {
+  daily: DailySignup[];
+}
 
 /* ── API 호출 헬퍼 ───────────────────────────────────── */
 
@@ -135,7 +145,45 @@ function KpiCard({
 }
 
 /* ── 상담 대기열 미니 ─────────────────────────────────── */
-function ConsultMiniQueue() {
+function ConsultMiniQueue({ onClick }: { onClick: () => void }) {
+  const [data, setData] = useState<ConsultationsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetchJSON<ConsultationsResponse>('/api/admin/consultations');
+        setData(res);
+      } catch {
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const consultations = data?.consultations ?? [];
+  const pendingCount = data?.pending_count ?? 0;
+
+  // pending_count를 상위로 전달하기 위한 이벤트 (간단히 data-attr 사용)
+  useEffect(() => {
+    if (pendingCount > 0) {
+      window.dispatchEvent(new CustomEvent('admin-pending-update', { detail: pendingCount }));
+    }
+  }, [pendingCount]);
+
+  const formatTime = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleString('ko-KR', {
+      timeZone: 'Asia/Seoul',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <div
       className="rounded-xl p-4 h-full flex flex-col"
@@ -145,40 +193,51 @@ function ConsultMiniQueue() {
         <h3 className="text-sm font-bold" style={{ color: '#FFF' }}>상담 대기열</h3>
         <span
           className="text-[10px] px-2 py-0.5 rounded-full font-bold"
-          style={{ background: 'rgba(255,215,0,0.1)', color: '#FFD700', border: '1px solid rgba(255,215,0,0.2)' }}
+          style={{ background: pendingCount > 0 ? 'rgba(255,59,59,0.15)' : 'rgba(255,215,0,0.1)', color: pendingCount > 0 ? '#FF3B3B' : '#FFD700', border: `1px solid ${pendingCount > 0 ? 'rgba(255,59,59,0.3)' : 'rgba(255,215,0,0.2)'}` }}
         >
-          {MOCK_CONSULT_QUEUE.filter(c => c.status === 'waiting').length} 대기
+          {pendingCount} ACTIVE
         </span>
       </div>
       <div className="space-y-2 flex-1 overflow-auto">
-        {MOCK_CONSULT_QUEUE.map(item => (
+        {loading && (
+          <div className="space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full" />
+            ))}
+          </div>
+        )}
+        {!loading && consultations.length === 0 && (
+          <p className="text-xs text-center py-8" style={{ color: '#555' }}>상담 내역이 없습니다</p>
+        )}
+        {!loading && consultations.map(item => (
           <div
             key={item.id}
-            className="flex items-center gap-3 rounded-lg p-3 transition-colors"
+            onClick={onClick}
+            className="flex items-center gap-3 rounded-lg p-3 transition-colors cursor-pointer hover:bg-white/[0.03]"
             style={{ background: '#0F0F0F', border: '1px solid #1A1A1A' }}
           >
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
               style={{ background: '#242424', color: '#FFF' }}
             >
-              {item.name.charAt(0)}
+              {(item.nickname || '?').charAt(0)}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-xs font-bold" style={{ color: '#FFF' }}>{item.name}</p>
+                <p className="text-xs font-bold" style={{ color: '#FFF' }}>{item.nickname || '알 수 없음'}</p>
                 <span
                   className="text-[9px] px-1.5 py-0.5 rounded font-bold"
                   style={{
-                    background: item.status === 'waiting' ? 'rgba(255,215,0,0.1)' : 'rgba(0,255,65,0.1)',
-                    color: item.status === 'waiting' ? '#FFD700' : '#00FF41',
+                    background: 'rgba(0,255,65,0.1)',
+                    color: '#00FF41',
                   }}
                 >
-                  {item.status === 'waiting' ? '대기' : '상담중'}
+                  {item.status === 'active' ? '진행중' : '대기'}
                 </span>
               </div>
-              <p className="text-[10px] truncate" style={{ color: '#666' }}>{item.message}</p>
+              <p className="text-[10px] truncate" style={{ color: '#666' }}>{item.last_message || item.title}</p>
             </div>
-            <span className="text-[10px] shrink-0" style={{ color: '#444' }}>{item.time}</span>
+            <span className="text-[10px] shrink-0" style={{ color: '#444' }}>{formatTime(item.updated_at)}</span>
           </div>
         ))}
       </div>
@@ -475,6 +534,9 @@ export default function AdminPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState('');
+  const [growthData, setGrowthData] = useState<{ date: string; users: number }[]>([]);
+  const [growthLoading, setGrowthLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     (async () => {
@@ -485,6 +547,24 @@ export default function AdminPage() {
         setStatsError(e.message || '통계를 불러올 수 없습니다');
       } finally {
         setStatsLoading(false);
+      }
+    })();
+
+    (async () => {
+      try {
+        const res = await fetchJSON<DailySignupsResponse>('/api/admin/daily-signups');
+        const formatted = (res.daily ?? []).map(d => {
+          const dt = new Date(d.date + 'T00:00:00');
+          return {
+            date: `${dt.getMonth() + 1}/${dt.getDate()}`,
+            users: d.count,
+          };
+        });
+        setGrowthData(formatted);
+      } catch {
+        // fallback: 빈 배열
+      } finally {
+        setGrowthLoading(false);
       }
     })();
   }, []);
@@ -591,7 +671,7 @@ export default function AdminPage() {
               <h3 className="text-sm font-bold mb-4" style={{ color: '#FFF' }}>사용자 증가 추이</h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={MOCK_GROWTH}>
+                  <BarChart data={growthData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1A1A1A" />
                     <XAxis
                       dataKey="date"
@@ -621,7 +701,7 @@ export default function AdminPage() {
             </div>
 
             {/* 상담 대기열 */}
-            <ConsultMiniQueue />
+            <ConsultMiniQueue onClick={() => router.push('/dashboard?tab=admin')} />
           </div>
 
           {/* 사용자 테이블 */}
