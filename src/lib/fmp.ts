@@ -59,7 +59,17 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
       })
     );
     // null 제거
-    return results.filter((r): r is Quote => r !== null);
+    const validResults = results.filter((r): r is Quote => r !== null);
+    
+    // FMP에서 누락된 심볼은 mock으로 보완
+    const returnedSymbols = new Set(validResults.map(r => r.symbol));
+    const missingSymbols = validSymbols.filter(s => !returnedSymbols.has(s));
+    if (missingSymbols.length > 0) {
+      const mockFill = getMockQuotes(missingSymbols);
+      return [...validResults, ...mockFill];
+    }
+    
+    return validResults;
   } catch (error) {
     console.error('FMP getQuotes error:', error);
     return getMockQuotes(symbols);
