@@ -69,24 +69,24 @@ export default function SignalChartLogo({
 
       {/* Text */}
       {showText && (
-        <span className="flex items-center">
+        <span className="flex items-baseline">
           <span
             className="font-bold tracking-tight"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               color: '#00FF41',
               textShadow: '0 0 20px rgba(0,255,65,0.3)',
-              fontSize: size * 0.38,
+              fontSize: size * 0.42,
             }}
           >
             AI
           </span>
           <span
-            className="font-semibold"
+            className="font-bold"
             style={{
               fontFamily: "'Pretendard', 'Space Grotesk', sans-serif",
               color: '#FFFFFF',
-              fontSize: size * 0.34,
+              fontSize: size * 0.42,
             }}
           >
             시그널톡
