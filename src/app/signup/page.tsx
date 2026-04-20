@@ -1,4 +1,5 @@
 'use client';
+import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -66,13 +67,7 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="flex items-center justify-center gap-2.5 mb-3">
-            <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
-              <path d="M4 26L12 14L20 20L30 6" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M24 6L30 6L30 12" stroke="#00FF41" strokeWidth="3.5" strokeLinecap="round"/>
-            </svg>
-            <span className="text-xl font-black text-white tracking-tight" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>AI 시그널톡</span>
-          </div>
+          <SignalChartLogo size={44} showText className="justify-center mb-3" />
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>실시간 투자 시그널과 트레이더 커뮤니티</p>
         </div>
 
