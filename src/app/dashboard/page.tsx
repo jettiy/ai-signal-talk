@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Sidebar, { type NavId } from '@/components/layout/Sidebar';
 import TickerBar from '@/components/dashboard/TickerBar';
@@ -12,34 +12,74 @@ import ProPanel from '@/components/dashboard/ProPanel';
 import AdminPanel from '@/components/dashboard/AdminPanel';
 import type { UserRole } from '@/lib/types';
 
-// TODO: 실제 인증 연동 후 서버에서 가져올 값
-// 지금은 테스트용으로 변경 가능: 'BASIC' | 'PENDING' | 'PRO' | 'ADMIN'
-const MOCK_USER_ROLE: UserRole = 'BASIC';
-const MOCK_USER_NAME = '준석';
+interface UserInfo {
+  id?: string;
+  email?: string;
+  nickname?: string;
+  level?: string;
+  is_pro?: boolean;
+}
+
+function getRoleFromLevel(level?: string, isPro?: boolean): UserRole {
+  if (level === 'LEVEL_99') return 'ADMIN';
+  if (isPro || level === 'LEVEL_50') return 'PRO';
+  return 'BASIC';
+}
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<NavId>('community');
-  const userRole = MOCK_USER_ROLE;
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>('BASIC');
 
-  // ADMIN이면 기본 탭이 community, 4번째 탭은 admin
-  // role에 따라 탭 제한
+  useEffect(() => {
+    // localStorage에서 로그인 정보 복원
+    try {
+      const raw = localStorage.getItem('user');
+      const token = localStorage.getItem('access_token');
+      if (raw && token) {
+        const u = JSON.parse(raw) as UserInfo;
+        setUser(u);
+        setUserRole(getRoleFromLevel(u.level, u.is_pro));
+      } else {
+        // 로그인 안 되어 있으면 랜딩으로
+        window.location.href = '/';
+      }
+    } catch {
+      window.location.href = '/';
+    }
+  }, []);
+
   const isValidTab = (tab: NavId): boolean => {
     if (tab === 'admin') return userRole === 'ADMIN';
     if (tab === 'pro') return userRole !== 'ADMIN';
     return true;
   };
 
-  // 유효하지 않은 탭이면 community로
   const safeTab = isValidTab(activeTab) ? activeTab : 'community';
+  const userName = user?.nickname || user?.email?.split('@')[0] || '트레이더';
+
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    window.location.href = '/';
+  };
+
+  if (!user) {
+    return (
+      <div className="flex h-screen items-center justify-center" style={{ background: '#0D0D0D' }}>
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: '#0D0D0D' }}>
-      {/* 사이드바 */}
       <Sidebar active={safeTab} onNavigate={setActiveTab} userRole={userRole} />
 
-      {/* 메인 영역 */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* 헤더 — PRO/관리자 전체화면 탭에서는 숨김 */}
         {safeTab !== 'pro' && safeTab !== 'admin' && (
           <header
             className="flex items-center justify-between px-5 shrink-0"
@@ -55,25 +95,28 @@ export default function DashboardPage() {
                 LIVE
               </span>
             </div>
-            <span className="text-[10px] font-mono" style={{ color: '#555' }}>
-              {new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })} KST
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400">{userName}</span>
+              <span className="text-[10px] font-mono" style={{ color: '#555' }}>
+                {new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })} KST
+              </span>
+              <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-red-400 transition-colors">
+                로그아웃
+              </button>
+            </div>
           </header>
         )}
 
-        {/* 틱커바 — PRO/관리자 탭에서는 숨김 */}
         {safeTab !== 'pro' && safeTab !== 'admin' && <TickerBar />}
 
-        {/* 탭 콘텐츠 */}
         <main className="flex-1 overflow-hidden">
           {safeTab === 'community' && <CommunityPanel />}
           {safeTab === 'signal' && <SignalPanel />}
           {safeTab === 'news' && <NewsPanel />}
-          {safeTab === 'pro' && <ProPanel userRole={userRole} userName={MOCK_USER_NAME} />}
+          {safeTab === 'pro' && <ProPanel userRole={userRole} userName={userName} />}
           {safeTab === 'admin' && userRole === 'ADMIN' && <AdminPanel />}
         </main>
 
-        {/* 상태바 — PRO/관리자 탭에서는 숨김 */}
         {safeTab !== 'pro' && safeTab !== 'admin' && <StatusBar />}
       </div>
     </div>

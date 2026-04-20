@@ -4,20 +4,20 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ai-signal-ta
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, full_name } = await req.json();
+    const { email, password, nickname } = await req.json();
 
-    if (!email || !password || !full_name) {
+    if (!email || !password || !nickname) {
       return NextResponse.json(
         { error: '모든 필드를 입력하세요.' },
         { status: 400 }
       );
     }
 
-    // 백엔드 실제 라우트: POST /register (JSON body)
+    // 백엔드 실제 라우트: POST /register (JSON body, nickname 필드)
     const res = await fetch(`${BACKEND_URL}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, full_name }),
+      body: JSON.stringify({ email, password, nickname }),
     });
 
     const data = await res.json();
