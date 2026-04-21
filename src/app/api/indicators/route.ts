@@ -68,13 +68,13 @@ export async function GET(req: NextRequest) {
   // 병렬로 모든 지표 호출
   try {
     const [rsiRes, macdRes, bbRes, stochRes, emaRes, sma50Res, sma200Res] = await Promise.allSettled([
-      fetchTd('/indicators/rsi', { symbol: tdSymbol, interval: tdTf, outputsize: '1', series_type: 'close' }),
-      fetchTd('/indicators/macd', { symbol: tdSymbol, interval: tdTf, outputsize: '1', series_type: 'close' }),
-      fetchTd('/indicators/bbands', { symbol: tdSymbol, interval: tdTf, outputsize: '1', series_type: 'close' }),
-      fetchTd('/indicators/stoch', { symbol: tdSymbol, interval: tdTf, outputsize: '1' }),
-      fetchTd('/indicators/ema', { symbol: tdSymbol, interval: tdTf, outputsize: '1', period: '20', series_type: 'close' }),
-      fetchTd('/indicators/sma', { symbol: tdSymbol, interval: tdTf, outputsize: '1', period: '50', series_type: 'close' }),
-      fetchTd('/indicators/sma', { symbol: tdSymbol, interval: tdTf, outputsize: '1', period: '200', series_type: 'close' }),
+      fetchTd('/rsi', { symbol: tdSymbol, interval: tdTf, outputsize: '1', series_type: 'close' }),
+      fetchTd('/macd', { symbol: tdSymbol, interval: tdTf, outputsize: '1', series_type: 'close' }),
+      fetchTd('/bbands', { symbol: tdSymbol, interval: tdTf, outputsize: '1', series_type: 'close' }),
+      fetchTd('/stoch', { symbol: tdSymbol, interval: tdTf, outputsize: '1' }),
+      fetchTd('/ema', { symbol: tdSymbol, interval: tdTf, outputsize: '1', period: '20', series_type: 'close' }),
+      fetchTd('/sma', { symbol: tdSymbol, interval: tdTf, outputsize: '1', period: '50', series_type: 'close' }),
+      fetchTd('/sma', { symbol: tdSymbol, interval: tdTf, outputsize: '1', period: '200', series_type: 'close' }),
     ]);
 
     // ── RSI ──

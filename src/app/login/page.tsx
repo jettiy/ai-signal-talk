@@ -1,6 +1,7 @@
 'use client';
 import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function LoginPage() {
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -38,7 +40,7 @@ export default function LoginPage() {
       localStorage.setItem('user', JSON.stringify(data.user));
 
       // 대시보드로 이동
-      window.location.href = '/dashboard';
+      router.push('/dashboard');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
     } finally {

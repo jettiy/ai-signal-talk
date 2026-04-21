@@ -1,6 +1,7 @@
 'use client';
 import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
 export default function SignupPage() {
@@ -12,6 +13,7 @@ export default function SignupPage() {
   const [pwError, setPwError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const router = useRouter();
 
   const validatePassword = (pw: string) => {
     if (pw.length < 8) return '비밀번호는 8자 이상이어야 합니다.';
@@ -52,7 +54,7 @@ export default function SignupPage() {
       }
 
       // 성공 → success 페이지로 이동
-      window.location.href = '/signup/success';
+      router.push('/signup/success');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : '회원가입에 실패했습니다.');
     } finally {
