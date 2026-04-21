@@ -100,6 +100,50 @@ function buildUserPrompt(
 
   const predictionType = getPredictionType(timeframe);
 
+  // 규칙 엔진 결과 섹션 (indicators에서 수치적 분석)
+  let ruleEngineSection = '';
+  if (indicators) {
+    const rsi = typeof indicators.rsi === 'object' ? (indicators.rsi as any).value : Number(indicators.rsi) || 50;
+    const macdHist = typeof indicators.macd === 'object' ? (indicators.macd as any).histogram : Number(indicators.macd) || 0;
+    const close = price;
+    const ema20 = Number(indicators.ema20) || close;
+    const ema50 = Number(indicators.sma50) || close;
+    const ema200 = Number(indicators.sma200) || close;
+    const atr = typeof indicators.bb === 'object' ? Math.abs(Number((indicators.bb as any).upper) - Number((indicators.bb as any).lower)) / 2 : close * 0.01;
+    // 모멘텀 점수: RSI 기반
+    const rsiScore = (rsi - 50) / 50;
+    const macdSign = macdHist >= 0 ? 1 : -1;
+    const momentum = 0.6 * rsiScore + 0.4 * macdSign;
+    // 추세 점수: EMA 비교
+    const above20 = close > ema20 ? 1 : -1;
+    const above50 = close > ema50 ? 1 : -1;
+    const above200 = close > ema200 ? 1 : -1;
+    const trend = (above20 + above50 + above200) / 3;
+    // 롱 확률
+    const pLong = Math.max(0, Math.min(100, 50 + 50 * (0.5 * trend + 0.5 * momentum)));
+    const direction = pLong >= 50 ? 'LONG' : 'SHORT';
+    const prob = direction === 'LONG' ? pLong : 100 - pLong;
+    // ATR 기반 진입/손절/목표
+    const stopDist = Math.max(atr * 1.5, close * 0.005);
+    const takeDist = Math.max(atr * 2.0, close * 0.01);
+    let entry = close, stopLoss = 0, takeProfit = 0;
+    if (direction === 'LONG') {
+      stopLoss = +(entry - stopDist).toFixed(2);
+      takeProfit = +(entry + takeDist).toFixed(2);
+    } else {
+      stopLoss = +(entry + stopDist).toFixed(2);
+      takeProfit = +(entry - takeDist).toFixed(2);
+    }
+    const rr = stopLoss !== 0 && stopLoss !== entry ? +(Math.abs(takeProfit - entry) / Math.abs(entry - stopLoss)).toFixed(2) : 1.5;
+    const evidence: string[] = [];
+    evidence.push(`RSI(14)=${rsi.toFixed(1)} (${rsi > 70 ? '과매수' : rsi < 30 ? '과매도' : '중립'})`);
+    evidence.push(`MACD Histogram=${macdHist.toFixed(2)} (${macdHist > 0 ? '상승 모멘텀' : '하락 모멘텀'})`);
+    if (close > ema20 && close > ema50) evidence.push('가격이 EMA20·EMA50 위 → 상승 추세');
+    else if (close < ema20 && close < ema50) evidence.push('가격이 EMA20·EMA50 아래 → 하락 추세');
+    else evidence.push('가격이 EMA20·50 엇갈림 → 혼조');
+    ruleEngineSection = `\n\n[규칙 엔진 분석 결과]\n방향: ${direction}, 확률: ${prob.toFixed(1)}%\n진입: $${entry.toFixed(2)}, 손절: $${stopLoss}, 목표: $${takeProfit}\n리스크/리워드: ${rr}\n근거: ${evidence.join(', ')}\n\n⚠️ 위 규칙 엔진 수치를 참고하여 시그널을 생성하세요. 수치와 크게 어긋나는 경우 근거를 명확히 설명하세요.`;
+  }
+
   return `종목: ${symbol} (ETF: ${ETF_MAP[symbol] || symbol})
 현재가: $${price}
 전일 대비: ${changePct > 0 ? '+' : ''}${changePct.toFixed(2)}%
@@ -109,7 +153,7 @@ function buildUserPrompt(
 최근 뉴스:
 ${newsSection || '최근 주요 뉴스 없음'}${webSection}${indicatorSection}
 
-위 데이터를 종합 분석해서 매매 시그널을 생성해. 가격은 ETF 실제 가격($${price}) 기준으로 entryPrice, stopLoss, targetPrice를 설정해.`;
+위 데이터를 종합 분석해서 매매 시그널을 생성해. 가격은 ETF 실제 가격($${price}) 기준으로 entryPrice, stopLoss, targetPrice를 설정해.${ruleEngineSection}`;
 }
 
 // ===== 1순위: DeepSeek V3.2 (속도 우선) =====
