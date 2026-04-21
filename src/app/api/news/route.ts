@@ -108,8 +108,8 @@ export async function GET(req: NextRequest) {
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       webResults = await webSearch(
-        `breaking news market Fed interest rate gold oil Nasdaq ${dateStr}`,
-        15
+        `시장 뉴스 Fed 금리 원유 골드 나스닥 비트코인 ${dateStr}`,
+        20
       );
     } else if (category) {
       webResults = await searchMarketNews(category as 'macro' | 'commodity' | 'tech' | 'crypto');
@@ -120,8 +120,8 @@ export async function GET(req: NextRequest) {
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       webResults = await webSearch(
-        `global market news ${dateStr} Fed interest rate oil gold Nasdaq latest`,
-        15
+        `글로벌 경제 뉴스 Fed 금리 원유 골드 나스닥 AI 비트코인 ${dateStr}`,
+        20
       );
     }
   } catch {}
@@ -151,9 +151,9 @@ export async function GET(req: NextRequest) {
   if (mode === 'breaking') {
     const scored = uniqueNews
       .map(n => ({ ...n, _impactScore: calcImpact(n.title, n.text || '') }))
-      .filter(n => (n as any)._impactScore >= 2 || isMarketMoving(n.title, n.text || ''))
+      .filter(n => (n as any)._impactScore >= 1 || isMarketMoving(n.title, n.text || ''))
       .sort((a, b) => (b as any)._impactScore - (a as any)._impactScore);
-    filteredNews = scored.slice(0, 15);
+    filteredNews = scored.length > 0 ? scored.slice(0, 15) : uniqueNews.slice(0, 10);
   }
 
   // ── 4. 한국어 번역 ────────────────────────────────────

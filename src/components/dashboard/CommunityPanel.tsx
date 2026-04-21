@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   MessageCircle, Send, Newspaper, Clock, Flame, TrendingUp, TrendingDown,
   Zap, BarChart3, Hash, Loader2,
@@ -195,23 +195,31 @@ function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: an
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const mountedRef = useRef(false);
+  const candleSeriesRef = useRef<any>(null);
 
   // chartData가 있으면 실제 데이터 사용, 없으면 폴백
-  const displayData = chartData && chartData.length > 0
-    ? chartData.map(d => ({
+  const displayData = useMemo(() => {
+    if (chartData && chartData.length > 0) {
+      return chartData.map(d => ({
         time: Math.floor(d.timestamp / 1000) as Time,
         open: d.open,
         high: d.high,
         low: d.low,
         close: d.close,
-      }))
-    : (FALLBACK_CHART_DATA[symbol] || FALLBACK_CHART_DATA.GCUSD);
+      }));
+    }
+    return FALLBACK_CHART_DATA[symbol] || FALLBACK_CHART_DATA.GCUSD;
+  }, [chartData, symbol]);
+
+  const displayDataRef = useRef<any[]>(displayData);
+  displayDataRef.current = displayData;
 
   const initChart = useCallback(() => {
     if (!containerRef.current || !mountedRef.current) return;
     if (chartRef.current) {
       try { chartRef.current.remove(); } catch {}
       chartRef.current = null;
+      candleSeriesRef.current = null;
     }
 
     const container = containerRef.current;
@@ -254,9 +262,10 @@ function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: an
       wickDownColor: '#FF3B3B80',
     });
 
-    candleSeries.setData(displayData);
+    candleSeries.setData(displayDataRef.current);
     chart.timeScale().fitContent();
     chartRef.current = chart;
+    candleSeriesRef.current = candleSeries;
 
     const handleResize = () => {
       if (container && chartRef.current) {
@@ -274,7 +283,17 @@ function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: an
       observer.disconnect();
       try { chart.remove(); } catch {}
     };
-  }, [symbol, displayData]);
+  }, [symbol]);
+
+  // displayData 변경 시 차트 데이터만 업데이트 (재생성하지 않음)
+  useEffect(() => {
+    const series = candleSeriesRef.current;
+    if (!series || !mountedRef.current) return;
+    try {
+      series.setData(displayDataRef.current);
+      chartRef.current?.timeScale().fitContent();
+    } catch {}
+  }, [chartData]);
 
   useEffect(() => {
     mountedRef.current = true;
