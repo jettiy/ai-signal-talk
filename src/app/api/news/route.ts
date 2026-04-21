@@ -38,6 +38,35 @@ function ensureUrl(item: NewsItem, webResults: WebSearchResult[]): NewsItem {
 }
 
 // ═══════════════════════════════════════════════════════════
+//  GDELT 뉴스 가져오기
+// ═══════════════════════════════════════════════════════════
+async function getGdeltNews(): Promise<NewsItem[]> {
+  try {
+    const url = 'https://api.gdeltproject.org/api/v2/doc/doc?query=financial OR economic OR stock OR market OR trading OR futures&mode=artlist&maxrecords=10&timespan=1d&format=json';
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    if (!data.articles) return [];
+    
+    return data.articles.map((a: any) => ({
+      symbol: 'MARKET',
+      publishedDate: a.seendate,
+      title: a.title,
+      text: '',
+      source: a.source || 'GDELT',
+      image: '',
+      url: a.url,
+      _importance: (a.title.toLowerCase().match(/breaking|crash|fed|inflation|cpi|gdp/i)) ? 
+                   (a.title.toLowerCase().match(/breaking|crash|fed/i) ? 'critical' : 'high') : 'normal'
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 //  시장 영향 키워드 필터 (Breaking News용)
 // ═══════════════════════════════════════════════════════════
 const BREAKING_KEYWORDS = [
@@ -100,11 +129,12 @@ export async function GET(req: NextRequest) {
     fmpNews = await getNews(symbol);
   } catch {}
 
-  // ── 2. 웹검색 보강 (모든 모드에서 사용) ──────────────
+  // ── 2. 웹검색 & GDELT 보강 ────────────────────────────
   let webResults: WebSearchResult[] = [];
+  let gdeltNews: NewsItem[] = [];
   try {
     if (mode === 'breaking') {
-      // Breaking: 시장 영향 뉴스 키워드로 검색
+      if (fmpNews.length < 5) gdeltNews = await getGdeltNews();
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       webResults = await webSearch(
@@ -136,13 +166,13 @@ export async function GET(req: NextRequest) {
     url: r.url,
   }));
 
-  // 병합 + 중복 제거
-  const allNews = [...fmpNews, ...webNewsItems];
-  const seen = new Set<string>();
+  // 병합 + 중복 제거 (url 기준)
+  const allNews = [...fmpNews, ...webNewsItems, ...gdeltNews];
+  const seenUrls = new Set<string>();
   const uniqueNews = allNews.filter((n) => {
-    const key = n.title.slice(0, 50).toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (!n.url || n.url === '#') return true;
+    if (seenUrls.has(n.url)) return false;
+    seenUrls.add(n.url);
     return true;
   });
 
