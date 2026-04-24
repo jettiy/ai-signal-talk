@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { callZaiGLMStream } from '@/lib/ai';
+import { callZaiGLM51Stream } from '@/lib/ai';
 import { searchFinancialNews } from '@/lib/zai-web-search';
 import { FUTURES_SYMBOLS } from '@/lib/types';
 
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         let fullContent = '';
 
         try {
-          fullContent = await callZaiGLMStream(
+          fullContent = await callZaiGLM51Stream(
             userPrompt,
             // onThinking — thinking 청크를 SSE로 전송
             (chunk: string) => {
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
           const result = {
             ...mapParsedResultLocal(parsed),
-            model: 'GLM-5',
+            model: 'GLM 5.1',
             reasoning: '',
             sources: webSearchResults.slice(0, 5).map((r) => ({
               title: r.title,

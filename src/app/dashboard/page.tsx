@@ -112,7 +112,7 @@ export default function DashboardPage() {
 
         <main className="flex-1 overflow-hidden">
           <ErrorBoundary>
-            {safeTab === 'community' && <CommunityPanel />}
+            {safeTab === 'community' && <CommunityPanel userName={userName} />}
             {safeTab === 'signal' && <SignalPanel userRole={userRole} />}
             {safeTab === 'news' && <NewsPanel />}
             {safeTab === 'pro' && <ProPanel userRole={userRole} userName={userName} />}

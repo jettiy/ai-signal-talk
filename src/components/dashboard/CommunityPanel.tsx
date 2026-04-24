@@ -305,7 +305,7 @@ function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: an
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────
-export default function CommunityPanel() {
+export default function CommunityPanel({ userName = '트레이더' }: { userName?: string }) {
   const [input, setInput] = useState('');
   const [activeChannel, setActiveChannel] = useState('general');
   const [activeMiniAsset, setActiveMiniAsset] = useState('NQUSD');
