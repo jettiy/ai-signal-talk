@@ -1,19 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   MessageCircle, Send, Newspaper, Clock, Flame, TrendingUp, TrendingDown,
-  Zap, BarChart3, Hash, Loader2,
+  Zap, Loader2,
 } from 'lucide-react';
-import {
-  createChart,
-  IChartApi,
-  CandlestickData,
-  Time,
-  CandlestickSeries,
-} from 'lightweight-charts';
 import { useMarketData } from '@/hooks/useMarketData';
-import { useChartData } from '@/hooks/useChartData';
 import { useNews } from '@/hooks/useNews';
 
 // ── 등급 스타일 ────────────────────────────────────────────────
@@ -68,9 +60,11 @@ const IMPACT_MAP = {
 
 // ── 미니차트 종목 ──────────────────────────────────────────────
 const MINI_CHART_ASSETS = [
+  { id: 'K200', label: 'K200선물', price: '385.50', change: '+0.00', dir: 'buy' as const },
   { id: 'NQUSD', label: '나스닥(QQQ)', price: '21,285.50', change: '+0.42', dir: 'buy' as const },
   { id: 'GCUSD', label: '골드(GLD)', price: '4,821.30', change: '+1.18', dir: 'buy' as const },
   { id: 'CLUSD', label: 'WTI(USO)', price: '64.80', change: '-0.35', dir: 'sell' as const },
+  { id: 'KOSPI', label: '코스피선물', price: '2,650.30', change: '+0.00', dir: 'buy' as const },
 ];
 
 // ── 시간프레임 ──────────────────────────────────────────────
@@ -89,36 +83,6 @@ const MENTION_OPTIONS = [
   { key: '시그널', desc: '시그널 봇 (시그널 요약)', emoji: '📊' },
   { key: '뉴스', desc: '뉴스 봇 (최신 뉴스 요약)', emoji: '📰' },
 ];
-
-// ── 미니차트 Mock 데이터 (API 로딩 전 폴백) ────────────────────────────
-function generateMiniCandleData(basePrice: number, volatility: number): CandlestickData[] {
-  const data: CandlestickData[] = [];
-  let price = basePrice;
-  const now = new Date();
-  for (let i = 30; i >= 0; i--) {
-    const date = new Date(now.getTime() - i * 5 * 60 * 1000);
-    const open = price;
-    const change = (Math.random() - 0.48) * volatility;
-    const close = open + change;
-    const high = Math.max(open, close) + Math.random() * volatility * 0.5;
-    const low = Math.min(open, close) - Math.random() * volatility * 0.5;
-    data.push({
-      time: date.toISOString().slice(0, 16).replace('T', ' ') as Time,
-      open: Math.round(open * 100) / 100,
-      high: Math.round(high * 100) / 100,
-      low: Math.round(low * 100) / 100,
-      close: Math.round(close * 100) / 100,
-    });
-    price = close;
-  }
-  return data;
-}
-
-const FALLBACK_CHART_DATA: Record<string, CandlestickData[]> = {
-  NQUSD: generateMiniCandleData(21285, 15),
-  GCUSD: generateMiniCandleData(4821, 8),
-  CLUSD: generateMiniCandleData(64.8, 0.3),
-};
 
 // ── 등급 이니셜 ────────────────────────────────────────────
 function getInitials(nickname: string) {
@@ -190,120 +154,6 @@ function ConfidenceGauge({ value, size = 80 }: { value: number; size?: number })
   );
 }
 
-// ── 미니 캔들차트 (API 데이터 연동) ────────────────────────────────
-function MiniCandleChart({ symbol, chartData }: { symbol: string; chartData?: any[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef = useRef<IChartApi | null>(null);
-  const mountedRef = useRef(false);
-  const candleSeriesRef = useRef<any>(null);
-
-  // chartData가 있으면 실제 데이터 사용, 없으면 폴백
-  const displayData = useMemo(() => {
-    if (chartData && chartData.length > 0) {
-      return chartData.map(d => ({
-        time: Math.floor(d.timestamp / 1000) as Time,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }));
-    }
-    return FALLBACK_CHART_DATA[symbol] || FALLBACK_CHART_DATA.GCUSD;
-  }, [chartData, symbol]);
-
-  const displayDataRef = useRef<any[]>(displayData);
-  displayDataRef.current = displayData;
-
-  const initChart = useCallback(() => {
-    if (!containerRef.current || !mountedRef.current) return;
-    if (chartRef.current) {
-      try { chartRef.current.remove(); } catch {}
-      chartRef.current = null;
-      candleSeriesRef.current = null;
-    }
-
-    const container = containerRef.current;
-    const data = FALLBACK_CHART_DATA[symbol] || FALLBACK_CHART_DATA.GCUSD;
-
-    const chart = createChart(container, {
-      width: container.clientWidth,
-      height: container.clientHeight,
-      layout: {
-        background: { color: 'transparent' },
-        textColor: '#555',
-        fontSize: 9,
-      },
-      grid: {
-        vertLines: { color: 'rgba(45,45,45,0.15)' },
-        horzLines: { color: 'rgba(45,45,45,0.15)' },
-      },
-      crosshair: {
-        mode: 0,
-        vertLine: { color: 'rgba(0,255,65,0.2)', width: 1, style: 2 },
-        horzLine: { color: 'rgba(0,255,65,0.2)', width: 1, style: 2 },
-      },
-      rightPriceScale: {
-        borderColor: '#1A1A1A',
-        scaleMargins: { top: 0.05, bottom: 0.05 },
-      },
-      timeScale: {
-        borderColor: '#1A1A1A',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
-
-    const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: '#00FF41',
-      downColor: '#FF3B3B',
-      borderUpColor: '#00FF41',
-      borderDownColor: '#FF3B3B',
-      wickUpColor: '#00FF4180',
-      wickDownColor: '#FF3B3B80',
-    });
-
-    candleSeries.setData(displayDataRef.current);
-    chart.timeScale().fitContent();
-    chartRef.current = chart;
-    candleSeriesRef.current = candleSeries;
-
-    const handleResize = () => {
-      if (container && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: container.clientWidth,
-          height: container.clientHeight,
-        });
-      }
-    };
-
-    const observer = new ResizeObserver(handleResize);
-    observer.observe(container);
-
-    return () => {
-      observer.disconnect();
-      try { chart.remove(); } catch {}
-    };
-  }, [symbol]);
-
-  // displayData 변경 시 차트 데이터만 업데이트 (재생성하지 않음)
-  useEffect(() => {
-    const series = candleSeriesRef.current;
-    if (!series || !mountedRef.current) return;
-    try {
-      series.setData(displayDataRef.current);
-      chartRef.current?.timeScale().fitContent();
-    } catch {}
-  }, [chartData]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    const cleanup = initChart();
-    return () => { mountedRef.current = false; try { cleanup?.(); } catch {} };
-  }, [initChart]);
-
-  return <div ref={containerRef} className="w-full h-full" />;
-}
-
 // ── 메인 컴포넌트 ────────────────────────────────────────
 export default function CommunityPanel({ userName = '트레이더' }: { userName?: string }) {
   const [input, setInput] = useState('');
@@ -344,14 +194,13 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
   const gcQuote = allQuotes?.find(q => q.symbol === 'GCUSD');
   const clQuote = allQuotes?.find(q => q.symbol === 'CLUSD');
 
-  // ── 차트 데이터 ──
-  const { data: miniChartData } = useChartData(activeMiniAsset, activeTimeframe);
-
   // 실시간 시세로 MINI_CHART_ASSETS 업데이트
   const liveAssets = [
-    { id: 'NQUSD' as const, label: '나스닥(QQQ)', price: nqQuote ? nqQuote.price.toLocaleString() : MINI_CHART_ASSETS[0].price, change: nqQuote ? nqQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[0].change, dir: ((nqQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
-    { id: 'GCUSD' as const, label: '골드(GLD)', price: gcQuote ? gcQuote.price.toLocaleString() : MINI_CHART_ASSETS[1].price, change: gcQuote ? gcQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[1].change, dir: ((gcQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
-    { id: 'CLUSD' as const, label: 'WTI(USO)', price: clQuote ? clQuote.price.toLocaleString() : MINI_CHART_ASSETS[2].price, change: clQuote ? clQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[2].change, dir: ((clQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
+    { id: 'K200' as const, label: 'K200선물', price: '385.50', change: '+0.00', dir: 'buy' as const },
+    { id: 'NQUSD' as const, label: '나스닥(QQQ)', price: nqQuote ? nqQuote.price.toLocaleString() : MINI_CHART_ASSETS[1].price, change: nqQuote ? nqQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[1].change, dir: ((nqQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
+    { id: 'GCUSD' as const, label: '골드(GLD)', price: gcQuote ? gcQuote.price.toLocaleString() : MINI_CHART_ASSETS[2].price, change: gcQuote ? gcQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[2].change, dir: ((gcQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
+    { id: 'CLUSD' as const, label: 'WTI(USO)', price: clQuote ? clQuote.price.toLocaleString() : MINI_CHART_ASSETS[3].price, change: clQuote ? clQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[3].change, dir: ((clQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
+    { id: 'KOSPI' as const, label: '코스피선물', price: '2,650.30', change: '+0.00', dir: 'buy' as const },
   ];
 
   const activeLiveAsset = liveAssets.find(a => a.id === activeMiniAsset) || liveAssets[0];
@@ -494,8 +343,8 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     // ── @시그널 멘션 → 시그널 봇 Mock 응답 ─────────────
     if (userMsg.includes('@시그널')) {
       const assetInfo = MINI_CHART_ASSETS.find(a => a.id === activeMiniAsset);
-      const entryPrice = activeMiniAsset === 'NQUSD' ? '21,210.50' : activeMiniAsset === 'GCUSD' ? '4,810.20' : '64.50';
-      const targetPrice = activeMiniAsset === 'NQUSD' ? '21,450.00' : activeMiniAsset === 'GCUSD' ? '4,880.00' : '66.20';
+      const entryPrice = activeMiniAsset === 'K200' ? '385.50' : activeMiniAsset === 'NQUSD' ? '21,210.50' : activeMiniAsset === 'GCUSD' ? '4,810.20' : activeMiniAsset === 'CLUSD' ? '64.50' : '2,645.00';
+      const targetPrice = activeMiniAsset === 'K200' ? '390.00' : activeMiniAsset === 'NQUSD' ? '21,450.00' : activeMiniAsset === 'GCUSD' ? '4,880.00' : activeMiniAsset === 'CLUSD' ? '66.20' : '2,680.00';
       const direction = assetInfo?.dir === 'buy' ? '매수' : '매도';
       const confidence = 76;
 
@@ -846,9 +695,55 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
           </div>
         </div>
 
-        {/* 미니 캔들차트 */}
-        <div className="shrink-0 px-2" style={{ height: 160 }}>
-          <MiniCandleChart symbol={activeMiniAsset} chartData={miniChartData} />
+        {/* 종목별 핵심 정보 요약 — 현재 방향, 변동폭, 간단한 지표 */}
+        <div className="shrink-0 px-4 py-3" style={{ borderBottom: '1px solid #1A1A1A', height: 160 }}>
+          <div className="flex items-center gap-4 h-full">
+            {/* 방향 아이콘 + 현재가 */}
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className="w-14 h-14 rounded-full flex items-center justify-center"
+                style={{
+                  background: currentAsset.dir === 'buy' ? 'rgba(0,255,65,0.08)' : 'rgba(255,59,59,0.08)',
+                  border: `2px solid ${currentAsset.dir === 'buy' ? 'rgba(0,255,65,0.3)' : 'rgba(255,59,59,0.3)'}`,
+                }}
+              >
+                {currentAsset.dir === 'buy' ? (
+                  <TrendingUp size={24} style={{ color: '#00FF41' }} />
+                ) : (
+                  <TrendingDown size={24} style={{ color: '#FF3B3B' }} />
+                )}
+              </div>
+              <span
+                className="text-[9px] font-bold"
+                style={{ color: currentAsset.dir === 'buy' ? '#00FF41' : '#FF3B3B' }}
+              >
+                {currentAsset.dir === 'buy' ? '상승' : '하락'}
+              </span>
+            </div>
+            {/* 가격 정보 */}
+            <div className="flex-1 space-y-1">
+              <div>
+                <span className="text-[8px] font-bold block" style={{ color: '#555' }}>현재가</span>
+                <span className="text-lg font-black font-mono text-white">{currentAsset.price}</span>
+              </div>
+              <div>
+                <span className="text-[8px] font-bold block" style={{ color: '#555' }}>변동률</span>
+                <span
+                  className="text-sm font-bold flex items-center gap-1"
+                  style={{ color: currentAsset.dir === 'buy' ? '#00FF41' : '#FF3B3B' }}
+                >
+                  {currentAsset.dir === 'buy' ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                  {currentAsset.change}%
+                </span>
+              </div>
+              <div>
+                <span className="text-[8px] font-bold block" style={{ color: '#555' }}>현재 방향</span>
+                <span className="text-xs font-bold" style={{ color: currentAsset.dir === 'buy' ? '#00FF41' : '#FF3B3B' }}>
+                  {currentAsset.dir === 'buy' ? '▲ 상승 추세' : '▼ 하락 추세'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* 신뢰도 게이지 + 진입가/목표가 */}
@@ -904,11 +799,15 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
           <p className="text-[10px] leading-relaxed" style={{ color: '#888' }}>
             {signalResult?.confidence
               ? `${currentAsset.label} AI 시그널 분석 완료. 신뢰도 ${signalResult.confidence}%. 진입가 ${signalResult.entryPrice?.toLocaleString() ?? '-'} → 목표가 ${signalResult.targetPrice?.toLocaleString() ?? '-'}`
+              : activeMiniAsset === 'K200'
+              ? 'K200선물 박스권 등락. 385선 지지 확인, 390선 돌파 시 상승 추세 전환 가능. AI 분석으로 진입가/목표가를 확인하세요.'
               : activeMiniAsset === 'NQUSD'
               ? '나스닥(QQQ) 상승 모멘텀 유지. RSI 58 중립권, 추가 상승 시 돌파 가능. AI 분석 버튼으로 상세 시그널을 확인하세요.'
               : activeMiniAsset === 'GCUSD'
               ? '골드(GLD) 강세 지속. 중앙은행 매수세 + 지정학 리스크 수혜. AI 분석으로 진입가/목표가를 확인하세요.'
-              : 'WTI(USO) 단기 조정 후 반등. OPEC+ 감산 연장 호재. AI 분석으로 매수/매도 시그널을 확인하세요.'}
+              : activeMiniAsset === 'CLUSD'
+              ? 'WTI(USO) 단기 조정 후 반등. OPEC+ 감산 연장 호재. AI 분석으로 매수/매도 시그널을 확인하세요.'
+              : '코스피선물 2,650선 지지 테스트 중. 외인 순매수 확인, AI 분석으로 상세 시그널을 확인하세요.'}
           </p>
         </div>
 

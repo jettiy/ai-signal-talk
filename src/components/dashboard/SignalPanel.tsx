@@ -1,24 +1,16 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import dynamic from 'next/dynamic';
-
-// lightweight-charts는 SSR에서 로드 불가 → dynamic import + ssr:false
-const CandlestickChart = dynamic(
-  () => import('@/components/charts/CandlestickChart'),
-  { ssr: false, loading: () => <div className="w-full h-full flex items-center justify-center text-[11px]" style={{ color: '#444' }}>차트 로딩중...</div> }
-);
 import ProbabilityDonut from './signal/ProbabilityDonut';
 import PriceTargets from './signal/PriceTargets';
 import TradeHistory from './signal/TradeHistory';
 import EconomicCalendar from './signal/EconomicCalendar';
-import { Zap, History, BarChart3, Brain, ExternalLink, Loader2 } from 'lucide-react';
+import { Zap, History, BarChart3, Brain, ExternalLink, Loader2, TrendingUp, TrendingDown, Target } from 'lucide-react';
 import { useAiSignal } from '@/hooks/useAiSignal';
 import { useAiSignalStream } from '@/hooks/useAiSignalStream';
 import { useMarketData } from '@/hooks/useMarketData';
-import { useChartData } from '@/hooks/useChartData';
 import { useNews } from '@/hooks/useNews';
-import { AiSignalResult, FUTURES_SYMBOLS, getPredictionType, UserRole } from '@/lib/types';
+import { AiSignalResult, getPredictionType, UserRole } from '@/lib/types';
 import UserBadge from './UserBadge';
 
 // ── Timeframe 설정 ──────────────────────────────────────────────
@@ -35,23 +27,29 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
+  { id: 'K200', label: 'K200선물', etf: '' },
   { id: 'NQUSD', label: '나스닥(QQQ)', etf: 'QQQ' },
   { id: 'GCUSD', label: '골드(GLD)', etf: 'GLD' },
   { id: 'CLUSD', label: 'WTI(USO)', etf: 'USO' },
+  { id: 'KOSPI', label: '코스피선물', etf: '' },
 ] as const;
 
 // ── 종목별 가격 포맷 & 단위 설정 ────────────────────────────────
 const ASSET_CONFIG: Record<string, { decimals: number; stopPct: number; targetPct: number }> = {
+  K200: { decimals: 2, stopPct: 0.6, targetPct: 1.0 },
   NQUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.2 },  // QQQ $500 → stop $497.5, target $506
   GCUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },  // GLD $300 → stop $298.5, target $303
   CLUSD: { decimals: 2, stopPct: 0.8, targetPct: 2.0 },  // USO $55 → stop $54.5, target $56.1
+  KOSPI: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
 };
 
 // ETF 심볼 매핑 (AI 프롬프트 + UI 표시용)
 const ETF_MAP: Record<string, string> = {
+  K200: '',
   NQUSD: 'QQQ',
   GCUSD: 'GLD',
   CLUSD: 'USO',
+  KOSPI: '',
 };
 
 // 실시간 가격 기반 폴백 시그널 생성
@@ -137,9 +135,6 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
   // 실시간 시세
   const { data: quotes } = useMarketData(asset);
   const currentQuote = quotes?.[0];
-
-  // 차트 데이터
-  const { data: chartData } = useChartData(asset, timeframe);
 
   // 뉴스
   const { data: news } = useNews({ symbol: asset });
@@ -249,7 +244,7 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
 
   return (
     <div className="flex h-full" style={{ background: '#0A0A0F' }}>
-      {/* ── 중앙: 차트 + 경제지표 ──────────────────────── */}
+      {/* ── 중앙: 시그널 요약 + 경제지표 ──────────────────── */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* 종목 탭 */}
         <div
@@ -330,22 +325,77 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
           )}
         </div>
 
-        {/* 차트 영역 */}
-        <div className="flex-1 min-h-0" style={{ background: '#0A0A0F' }}>
-          <CandlestickChart
-            data={chartData?.map((d) => ({
-              time: (d.timestamp / 1000) as any,
-              open: d.open,
-              high: d.high,
-              low: d.low,
-              close: d.close,
-            })) || []}
-            signal={{
-              entryPrice: aiResult?.entryPrice || parseFloat(fallback.entry.replace(/,/g, '')),
-              targetPrice: aiResult?.targetPrice || parseFloat(fallback.takeProfit.replace(/,/g, '')),
-              stopLoss: aiResult?.stopLoss || parseFloat(fallback.stopLoss.replace(/,/g, '')),
-            }}
-          />
+        {/* 시그널 요약 그리드 — 모든 시간프레임 방향/확률/진입가/목표가 */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-3" style={{ background: '#0A0A0F' }}>
+          <div className="grid grid-cols-3 gap-2">
+            {TIMEFRAMES.map((tf) => {
+              const sig = getFallbackSignal(asset, tf.id, livePrice);
+              const color = sig.direction === 'buy' ? '#00FF41' : '#FF3B3B';
+              const bgColor = sig.direction === 'buy' ? 'rgba(0,255,65,0.06)' : 'rgba(255,59,59,0.06)';
+              const borderColor = sig.direction === 'buy' ? 'rgba(0,255,65,0.2)' : 'rgba(255,59,59,0.2)';
+              return (
+                <div
+                  key={tf.id}
+                  className="rounded-xl p-3 flex flex-col gap-1.5"
+                  style={{ background: bgColor, border: `1px solid ${borderColor}` }}
+                >
+                  {/* 시간프레임 + 방향 */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold" style={{ color: '#888' }}>{tf.label}</span>
+                    <div className="flex items-center gap-1">
+                      {sig.direction === 'buy' ? (
+                        <TrendingUp size={11} style={{ color }} />
+                      ) : (
+                        <TrendingDown size={11} style={{ color }} />
+                      )}
+                      <span className="text-[11px] font-bold" style={{ color }}>
+                        {sig.direction === 'buy' ? 'LONG' : 'SHORT'}
+                      </span>
+                    </div>
+                  </div>
+                  {/* 확률 바 */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] font-mono" style={{ color: '#00FF41' }}>{sig.buyProb}%</span>
+                    <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: '#1A1A1A' }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${sig.buyProb}%`,
+                          background: sig.direction === 'buy'
+                            ? 'linear-gradient(90deg, #00FF41, #00CC33)'
+                            : 'linear-gradient(90deg, #FF3B3B, #CC0000)',
+                        }}
+                      />
+                    </div>
+                    <span className="text-[9px] font-mono" style={{ color: '#FF3B3B' }}>{sig.sellProb}%</span>
+                  </div>
+                  {/* 진입가 */}
+                  <div className="flex items-center gap-1">
+                    <Target size={9} style={{ color: '#555' }} />
+                    <span className="text-[9px] font-mono" style={{ color: '#999' }}>진입 {sig.entry}</span>
+                  </div>
+                  {/* 목표가 */}
+                  <div className="flex items-center gap-1">
+                    <TrendingUp size={9} style={{ color }} />
+                    <span className="text-[9px] font-mono" style={{ color: '#999' }}>목표 {sig.takeProfit}</span>
+                  </div>
+                  {/* 신뢰도 */}
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-[8px]" style={{ color: '#555' }}>신뢰도</span>
+                    <span className="text-[10px] font-bold font-mono" style={{
+                      color: sig.confidence >= 70 ? '#00FF41' : sig.confidence >= 50 ? '#FFD700' : '#FF3B3B',
+                    }}>
+                      {sig.confidence}%
+                    </span>
+                  </div>
+                  {/* 근거 (한줄) */}
+                  <p className="text-[8px] leading-tight mt-0.5 line-clamp-2" style={{ color: '#666' }}>
+                    {sig.rationale}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* 주요 경제지표 일정 */}

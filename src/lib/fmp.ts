@@ -12,7 +12,7 @@ const TD_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
 // ─── 심볼 매핑: 우리 내부 심볼 ↔ 각 API 심볼 ───
 const INTERNAL_TO_FMP: Record<string, string> = {
-  NQUSD: 'QQQ', GCUSD: 'GLD', CLUSD: 'USO',
+  NQUSD: 'QQQ', GCUSD: 'GLD', CLUSD: 'USO', K200: 'K200', KOSPI: '^KS11',
   AAPL: 'AAPL', NVDA: 'NVDA', TSLA: 'TSLA',
   META: 'META', MSFT: 'MSFT', AMZN: 'AMZN', SPY: 'SPY', QQQ: 'QQQ',
 };
@@ -21,12 +21,15 @@ const INTERNAL_TO_TD: Record<string, string> = {
   NQUSD: 'QQQ',   // 나스닥 100 ETF
   GCUSD: 'GLD',   // 골드 ETF
   CLUSD: 'USO',   // WTI 원유 ETF
+  K200: 'K200',   // 코스피 200 선물
+  KOSPI: '^KS11', // 코스피 지수
   AAPL: 'AAPL', NVDA: 'NVDA', TSLA: 'TSLA',
   META: 'META', MSFT: 'MSFT', AMZN: 'AMZN', SPY: 'SPY', QQQ: 'QQQ',
 };
 
 const TD_LABEL_MAP: Record<string, string> = {
   QQQ: '나스닥 100 ETF', GLD: '골드 ETF', USO: 'WTI 원유 ETF',
+  K200: '코스피 200 선물', '^KS11': '코스피 지수',
 };
 
 // ─── Timeframe 매핑: 우리 내부 ↔ Twelve Data ───
@@ -329,6 +332,8 @@ export function getMockQuotes(symbols: string[]): Quote[] {
     'GCUSD': { price: 4814.7, changesPercentage: 0.13, change: 6.4, dayLow: 4785.9, dayHigh: 4827.2, yearHigh: 5626.8, yearLow: 3123.3, marketCap: 0, priceAvg50: 4891.3, priceAvg200: 4377.5, volume: 28029, avgVolume: 25000, exchange: 'COMMODITY', open: 4811.8, previousClose: 4808.3, eps: 0, pe: 0 },
     'NQUSD': { price: 21285.5, changesPercentage: 0.42, change: 89.2, dayLow: 21150, dayHigh: 21320, yearHigh: 22500, yearLow: 18500, marketCap: 0, priceAvg50: 20800, priceAvg200: 19500, volume: 150000, avgVolume: 120000, exchange: 'COMMODITY', open: 21200, previousClose: 21196.3, eps: 0, pe: 0 },
     'CLUSD': { price: 64.8, changesPercentage: -0.35, change: -0.23, dayLow: 64.2, dayHigh: 65.1, yearHigh: 82.5, yearLow: 55.0, marketCap: 0, priceAvg50: 67.5, priceAvg200: 71.2, volume: 250000, avgVolume: 220000, exchange: 'COMMODITY', open: 65.03, previousClose: 65.03, eps: 0, pe: 0 },
+    'K200': { price: 385.5, changesPercentage: 0.55, change: 2.1, dayLow: 383.0, dayHigh: 387.2, yearHigh: 420.0, yearLow: 340.0, marketCap: 0, priceAvg50: 380.0, priceAvg200: 360.0, volume: 120000, avgVolume: 100000, exchange: 'KRX', open: 383.5, previousClose: 383.4, eps: 0, pe: 0 },
+    'KOSPI': { price: 2650.3, changesPercentage: 0.38, change: 10.1, dayLow: 2635.0, dayHigh: 2665.0, yearHigh: 2800.0, yearLow: 2400.0, marketCap: 0, priceAvg50: 2620.0, priceAvg200: 2550.0, volume: 800000, avgVolume: 750000, exchange: 'KRX', open: 2640.2, previousClose: 2640.2, eps: 0, pe: 0 },
     'AAPL': { price: 263.4, changesPercentage: 1.23, change: 3.2, dayLow: 260.0, dayHigh: 264.5, yearHigh: 270.0, yearLow: 200.0, marketCap: 4000000000000, priceAvg50: 255.0, priceAvg200: 240.0, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 260.5, previousClose: 260.2, eps: 6.58, pe: 40.0 },
     'NVDA': { price: 198.35, changesPercentage: 3.45, change: 6.6, dayLow: 192.0, dayHigh: 200.5, yearHigh: 210.0, yearLow: 100.0, marketCap: 4800000000000, priceAvg50: 185.0, priceAvg200: 160.0, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 191.8, previousClose: 191.7, eps: 3.20, pe: 61.8 },
     'TSLA': { price: 388.9, changesPercentage: -2.34, change: -9.3, dayLow: 382.0, dayHigh: 400.0, yearHigh: 420.0, yearLow: 250.0, marketCap: 1200000000000, priceAvg50: 370.0, priceAvg200: 340.0, volume: 95234000, avgVolume: 90000000, exchange: 'NASDAQ', open: 398.2, previousClose: 398.2, eps: 4.20, pe: 92.6 },
@@ -366,6 +371,8 @@ export function getMockChartData(symbol = 'GCUSD'): CandleData[] {
     'NQUSD': { basePrice: 21285, volatility: 15 },
     'GCUSD': { basePrice: 4810, volatility: 4 },
     'CLUSD': { basePrice: 64.8, volatility: 0.3 },
+    'K200': { basePrice: 385.5, volatility: 0.8 },
+    'KOSPI': { basePrice: 2650, volatility: 5 },
   };
   const { basePrice, volatility } = config[symbol] || config['GCUSD'];
   const data: CandleData[] = [];

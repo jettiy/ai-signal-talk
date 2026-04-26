@@ -115,9 +115,11 @@ export interface ToolCall {
 
 // FMP 대시보드 기본 종목 (현재 구독에서 사용 가능한 심볼)
 export const FUTURES_SYMBOLS = {
+  K200: { symbol: 'K200', label: 'K200선물', fmpChart: 'K200' },
   NQ: { symbol: 'NQUSD', label: '나스닥선물', fmpChart: 'NQUSD' },
   GC: { symbol: 'GCUSD', label: '골드선물', fmpChart: 'GCUSD' },
   CL: { symbol: 'CLUSD', label: 'WTI선물', fmpChart: 'CLUSD' },
+  KOSPI: { symbol: 'KOSPI', label: '코스피선물', fmpChart: 'KOSPI' },
 } as const;
 
 export type FuturesTab = keyof typeof FUTURES_SYMBOLS;
@@ -142,7 +144,7 @@ export const TRACKED_SYMBOLS = [
   'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AMD', 'INTC',
   'SPY', 'QQQ', 'DIA', 'IWM',
   'GLD', 'SLV', 'USO',
-  'GCUSD', 'CLUSD', 'NQUSD',
+  'GCUSD', 'CLUSD', 'NQUSD', 'K200', 'KOSPI',
 ];
 
 // ===== 유저 역할 (RBAC) =====

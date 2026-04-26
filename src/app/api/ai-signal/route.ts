@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateAiSignal } from '@/lib/ai';
+import { generateSignal } from '@/lib/ai';
 import { searchFinancialNews } from '@/lib/zai-web-search';
 import { FUTURES_SYMBOLS } from '@/lib/types';
 
@@ -54,15 +54,15 @@ export async function POST(req: NextRequest) {
       // 웹검색 실패해도 시그널 생성은 진행
     }
 
-    const result = await generateAiSignal({
+    const result = await generateSignal(
       symbol,
       price,
-      changePct,
-      news: news || [],
-      timeframe: timeframe || '1hour',
+      news || [],
+      changePct || 0,
+      timeframe || '1hour',
       webSearchResults,
       indicators,
-    });
+    );
 
     return NextResponse.json({ ...result, remaining });
   } catch (e) {
