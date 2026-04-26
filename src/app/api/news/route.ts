@@ -3,6 +3,24 @@ import { getNews } from '@/lib/fmp';
 import { webSearch, searchMarketNews, searchFinancialNews, translateNewsToKorean } from '@/lib/zai-web-search';
 import type { NewsItem, WebSearchResult } from '@/lib/types';
 
+/** 출처별 기본 URL 매핑 */
+const SOURCE_DEFAULT_URLS: Record<string, string> = {
+  reuters: 'https://www.reuters.com',
+  bloomberg: 'https://www.bloomberg.com',
+  cnbc: 'https://www.cnbc.com',
+  'market watch': 'https://www.marketwatch.com',
+  'investing.com': 'https://www.investing.com',
+  yahoo: 'https://finance.yahoo.com',
+};
+
+function getDefaultUrl(source: string): string {
+  const lower = source.toLowerCase();
+  for (const [key, url] of Object.entries(SOURCE_DEFAULT_URLS)) {
+    if (lower.includes(key)) return url;
+  }
+  return '';
+}
+
 // ═══════════════════════════════════════════════════════════
 //  강화된 URL 매칭 — 제목으로 실제 기사 URL 찾기
 // ═══════════════════════════════════════════════════════════
@@ -44,6 +62,15 @@ function ensureValidUrl(item: NewsItem, webResults: WebSearchResult[]): string {
 
   // 찾지 못함 → 이 뉴스는 표시 불가
   return '';
+}
+
+function ensureUrl(item: NewsItem, webResults: WebSearchResult[]): NewsItem {
+  if (item.url && item.url !== '#' && item.url !== '' && item.url.startsWith('http')) return item;
+  const matched = findExactUrl(item.title, webResults);
+  if (matched) return { ...item, url: matched };
+  const defUrl = getDefaultUrl(item.source);
+  if (defUrl) return { ...item, url: defUrl };
+  return item;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -228,17 +255,15 @@ export async function GET(req: NextRequest) {
     filteredNews = scored.length > 0 ? scored.slice(0, 20) : uniqueNews.slice(0, 15);
   }
 
+  // ── 4. URL 보강 (번역 전 원본 제목 기준) ────────────
+  const urlEnriched = filteredNews.map((item) => ensureUrl(item, webResults));
+
   // ── 5. 한국어 번역 ──────────────────────────────────
-  const translatedNews = await translateNewsToKorean(filteredNews);
+  const translatedNews = await translateNewsToKorean(urlEnriched);
 
   // ── 6. URL 최종 검증 — 유효한 URL만 남김 ────────────
   const enriched = translatedNews
-    .map((item) => {
-      const finalUrl = ensureValidUrl(item, webResults);
-      if (!finalUrl) return null; // URL을 찾을 수 없으면 제외
-      return { ...item, url: finalUrl, image: item.image || '' };
-    })
-    .filter((n): n is NewsItem => n !== null);
+    .filter((item) => item.url && item.url !== '#' && item.url.startsWith('http'));
 
   // ── 7. 캐시 ──────────────────────────────────────────
   const cacheMaxAge = mode === 'breaking' ? 300 : 3600;
