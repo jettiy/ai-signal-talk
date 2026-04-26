@@ -86,81 +86,12 @@ function transformNewsItem(item: NewsItem, index: number): NewsUiItem {
   };
 }
 
-// ── Fallback Mock ─────────────────────────────────────────────
-const FALLBACK_NEWS: NewsUiItem[] = [
-  {
-    id: 'fallback-1',
-    title: '연준, 금리 동결 결정... "추가 인하 여지 열어두겠다"',
-    source: 'Reuters',
-    time: '12분 전',
-    category: 'macro',
-    impact: 'high',
-    summary: '미 연방준비제도가 기준금리를 동결하기로 결정했습니다. 파월 의장은 인플레이션이 2% 목표치를 향해 지속적으로 완화되는 것을 더 봐야 한다고 밝혔습니다.',
-    relatedSymbols: ['NQUSD', 'GCUSD'],
-    url: 'https://www.reuters.com',
-    image: '',
-  },
-  {
-    id: 'fallback-2',
-    title: '골드, $4,800 돌파... 중앙은행 매수세 + 지정학 리스크 겹침',
-    source: 'Bloomberg',
-    time: '28분 전',
-    category: 'commodity',
-    impact: 'high',
-    summary: '금값이 사상 최고치를 경신하며 $4,800을 돌파했습니다. 세계 중앙은행들의 꾸준한 골드 매입과 중동 지정학적 긴장이 상승을 견인하고 있습니다.',
-    relatedSymbols: ['GCUSD'],
-    url: 'https://www.bloomberg.com',
-    image: '',
-  },
-  {
-    id: 'fallback-3',
-    title: '엔비디아, AI 칩 수요 견조... 분기 매출 30% 증가 전망',
-    source: 'CNBC',
-    time: '1시간 전',
-    category: 'tech',
-    impact: 'medium',
-    summary: '엔비디아가 다음 분기 매출 가이던스를 상향 조정했습니다. 데이터센터 AI 칩 수요가 여전히 공급을 초과하며, 블랙웰 아키텍처 출하량이 가속화되고 있습니다.',
-    relatedSymbols: ['NVDA', 'NQUSD'],
-    url: 'https://www.cnbc.com',
-    image: '',
-  },
-  {
-    id: 'fallback-4',
-    title: 'WTI 원유, OPEC+ 감산 연장 소식에 $65 회복',
-    source: 'Reuters',
-    time: '2시간 전',
-    category: 'commodity',
-    impact: 'medium',
-    summary: 'OPEC+가 자발적 감산을 3개월 연장하기로 합의했습니다. 이로 인해 WTI 원유가 $65 수준을 회복했으며, 단기 공급 우려가 완화되었습니다.',
-    relatedSymbols: ['CLUSD'],
-    url: 'https://www.reuters.com',
-    image: '',
-  },
-  {
-    id: 'fallback-5',
-    title: '비트코인, 기관 투자자 유입 본격화... ETF 자금 유입 사상 최대',
-    source: 'CoinDesk',
-    time: '3시간 전',
-    category: 'crypto',
-    impact: 'high',
-    summary: '미국 스팟 비트코인 ETF에 일일 $2.1B 자금이 유입되며 사상 최대 기록을 세웠습니다.',
-    relatedSymbols: ['BTCUSD'],
-    url: 'https://www.coindesk.com',
-    image: '',
-  },
-  {
-    id: 'fallback-6',
-    title: '애플, AI 기능 탑재 아이폰 17 공급망 물량 20% 증량',
-    source: 'Nikkei Asia',
-    time: '4시간 전',
-    category: 'tech',
-    impact: 'low',
-    summary: '애플이 아이폰 17 시리즈의 부품 주문량을 전작 대비 20% 늘렸다고 닛케이가 보도했습니다.',
-    relatedSymbols: ['AAPL'],
-    url: 'https://asia.nikkei.com',
-    image: '',
-  },
-];
+// ── NewsLink 컴포넌트 ────────────────────────────────────────
+function NewsLink({ url, children }: { url: string; children: React.ReactNode }) {
+  return url && url !== '#' && url.startsWith('http')
+    ? <a href={url} target="_blank" rel="noopener noreferrer" className="block no-underline">{children}</a>
+    : <div className="block">{children}</div>;
+}
 
 // ── 임팩트 배지 컴포넌트 ──────────────────────────────────────
 function ImpactBadge({ impact }: { impact: 'high' | 'medium' | 'low' }) {
@@ -308,18 +239,21 @@ function EconomicIndicatorsCard() {
 export default function NewsPanel() {
   const [activeCategory, setActiveCategory] = useState('all');
 
-  const { data: apiNews, isLoading } = useNews(
+  const { data: apiNews, isLoading, isError } = useNews(
     activeCategory !== 'all'
       ? { category: activeCategory as 'macro' | 'commodity' | 'tech' | 'crypto' }
       : undefined
   );
 
-  const newsItems: NewsUiItem[] =
+  // FMP + 웹검색에서 가져온 실데이터만 사용. 하드코딩 폴백 없음.
+  const rawItems: NewsUiItem[] =
     apiNews && apiNews.length > 0
-      ? apiNews.map((item, i) => transformNewsItem(item, i))
-      : FALLBACK_NEWS;
+      ? apiNews
+          .map((item, i) => transformNewsItem(item, i))
+          .filter((n) => n.url && n.url !== '#' && n.url.startsWith('http'))
+      : [];
 
-  const filteredNews = newsItems.filter((n) =>
+  const filteredNews = rawItems.filter((n) =>
     activeCategory === 'all' || n.category === activeCategory
   );
 
@@ -505,16 +439,4 @@ export default function NewsPanel() {
       </div>
     </div>
   );
-}
-
-// ── 뉴스 링크 래퍼 (url 있으면 <a>, 없으면 <div>) ────────────
-function NewsLink({ url, children }: { url: string; children: React.ReactNode }) {
-  if (url && url !== '#' && url !== '') {
-    return (
-      <a href={url} target="_blank" rel="noopener noreferrer" className="block no-underline">
-        {children}
-      </a>
-    );
-  }
-  return <div>{children}</div>;
 }
