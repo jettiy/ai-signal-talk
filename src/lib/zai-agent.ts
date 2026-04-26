@@ -22,7 +22,7 @@ const AGENT_TOOLS = [
         properties: {
           symbol: {
             type: 'string',
-            description: '조회할 종목 심볼 (예: GCUSD=골드, AAPL=애플, NVDA=엔비디아, K200=K200선물, KOSPI=코스피선물)',
+            description: '조회할 종목 심볼 (예: GCUSD=골드, AAPL=애플, NVDA=엔비디아, KOSPI=코스피선물)',
           },
         },
         required: ['symbol'],

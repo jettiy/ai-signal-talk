@@ -27,7 +27,6 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
-  { id: 'K200', label: 'K200선물', etf: '' },
   { id: 'NQUSD', label: '나스닥(QQQ)', etf: 'QQQ' },
   { id: 'GCUSD', label: '골드(GLD)', etf: 'GLD' },
   { id: 'CLUSD', label: 'WTI(USO)', etf: 'USO' },
@@ -36,7 +35,6 @@ const ASSETS = [
 
 // ── 종목별 가격 포맷 & 단위 설정 ────────────────────────────────
 const ASSET_CONFIG: Record<string, { decimals: number; stopPct: number; targetPct: number }> = {
-  K200: { decimals: 2, stopPct: 0.6, targetPct: 1.0 },
   NQUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.2 },  // QQQ $500 → stop $497.5, target $506
   GCUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },  // GLD $300 → stop $298.5, target $303
   CLUSD: { decimals: 2, stopPct: 0.8, targetPct: 2.0 },  // USO $55 → stop $54.5, target $56.1
@@ -45,7 +43,6 @@ const ASSET_CONFIG: Record<string, { decimals: number; stopPct: number; targetPc
 
 // ETF 심볼 매핑 (AI 프롬프트 + UI 표시용)
 const ETF_MAP: Record<string, string> = {
-  K200: '',
   NQUSD: 'QQQ',
   GCUSD: 'GLD',
   CLUSD: 'USO',
@@ -83,42 +80,42 @@ function getFallbackSignal(asset: string, tf: TimeframeId, livePrice?: number) {
       entry: fmt(p), stopLoss: fmt(p * (1 - stopMul * 0.3)), takeProfit: fmt(p * (1 + targetMul * 0.4)),
       riskReward: '2.5', confidence: 58,
       predictionType: '다음 봉 예측',
-      rationale: `${etf} 1분봉 RSI 30 이하 과매도 구간에서 반등 패턴 감지.`,
+      rationale: `${etf} 1분봉 RSI 과매도 반등. 단기 매수세 유입.`,
     },
     '5min': {
       direction: 'sell', buyProb: 35, sellProb: 65,
       entry: fmt(p * 1.001), stopLoss: fmt(p * (1 + stopMul * 0.5)), takeProfit: fmt(p * (1 - targetMul * 0.6)),
       riskReward: '2.5', confidence: 65,
       predictionType: '다음 봉 예측',
-      rationale: `${etf} 5분봉 상단 밴드 터치 후 거부. MACD 음배열 전환.`,
+      rationale: `${etf} 5분봉 상단밴드 저항. MACD 데드크로스.`,
     },
     '15min': {
       direction: 'buy', buyProb: 71, sellProb: 29,
       entry: fmt(p * 0.999), stopLoss: fmt(p * (1 - stopMul)), takeProfit: fmt(p * (1 + targetMul)),
       riskReward: '2.3', confidence: 71,
       predictionType: '현재봉 마감',
-      rationale: `${etf} 15분봉 EMA21 지지 확인. 스토캐스틱 골든크로스 발생.`,
+      rationale: `${etf} 15분봉 EMA21 지지. 스토캐스틱 골든크로스.`,
     },
     '30min': {
       direction: 'buy', buyProb: 58, sellProb: 42,
       entry: fmt(p), stopLoss: fmt(p * (1 - stopMul * 1.2)), takeProfit: fmt(p * (1 + targetMul * 1.1)),
       riskReward: '1.86', confidence: 58,
       predictionType: '현재봉 마감',
-      rationale: `${etf} 30분봉 EMA50 지지선 테스트 중. 매수세 유입 확인.`,
+      rationale: `${etf} 30분봉 EMA50 지지. 볼린저 미들밴드 반등.`,
     },
     '1hour': {
       direction: 'sell', buyProb: 40, sellProb: 60,
       entry: fmt(p * 1.002), stopLoss: fmt(p * (1 + stopMul * 1.5)), takeProfit: fmt(p * (1 - targetMul * 1.5)),
       riskReward: '2.1', confidence: 60,
       predictionType: '현재봉 마감',
-      rationale: `${etf} 1시간봉 더블탑 패턴 완성. RSI 70 과매수.`,
+      rationale: `${etf} 1시간봉 더블탑. RSI 70 과매수 divergence.`,
     },
     '1day': {
       direction: 'buy', buyProb: 74, sellProb: 26,
       entry: fmt(p * 0.998), stopLoss: fmt(p * (1 - stopMul * 3)), takeProfit: fmt(p * (1 + targetMul * 3)),
       riskReward: '1.94', confidence: 74,
       predictionType: '현재봉 마감',
-      rationale: `${etf} 일봉 EMA200 지지. 전일 강한 양봉 이어 하락 저항.`,
+      rationale: `${etf} 일봉 EMA200 지지. 양봉 모멘텀 지속.`,
     },
   };
 
@@ -312,7 +309,7 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
               color: isShortTerm ? '#00B4D8' : '#A855F7',
             }}
           >
-            {displaySignal.predictionType}
+            예측 유형: {displaySignal.predictionType}
           </span>
           {/* AI 모델 표시 */}
           {displaySignal.model && (

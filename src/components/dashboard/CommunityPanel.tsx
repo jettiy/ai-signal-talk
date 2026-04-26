@@ -60,11 +60,10 @@ const IMPACT_MAP = {
 
 // ── 미니차트 종목 ──────────────────────────────────────────────
 const MINI_CHART_ASSETS = [
-  { id: 'K200', label: 'K200선물', price: '385.50', change: '+0.00', dir: 'buy' as const },
+  { id: 'KOSPI', label: '코스피선물', price: '2,650.30', change: '+0.00', dir: 'buy' as const },
   { id: 'NQUSD', label: '나스닥(QQQ)', price: '21,285.50', change: '+0.42', dir: 'buy' as const },
   { id: 'GCUSD', label: '골드(GLD)', price: '4,821.30', change: '+1.18', dir: 'buy' as const },
   { id: 'CLUSD', label: 'WTI(USO)', price: '64.80', change: '-0.35', dir: 'sell' as const },
-  { id: 'KOSPI', label: '코스피선물', price: '2,650.30', change: '+0.00', dir: 'buy' as const },
 ];
 
 // ── 시간프레임 ──────────────────────────────────────────────
@@ -196,11 +195,10 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
 
   // 실시간 시세로 MINI_CHART_ASSETS 업데이트
   const liveAssets = [
-    { id: 'K200' as const, label: 'K200선물', price: '385.50', change: '+0.00', dir: 'buy' as const },
+    { id: 'KOSPI' as const, label: '코스피선물', price: MINI_CHART_ASSETS[0].price, change: MINI_CHART_ASSETS[0].change, dir: 'buy' as 'buy' | 'sell' },
     { id: 'NQUSD' as const, label: '나스닥(QQQ)', price: nqQuote ? nqQuote.price.toLocaleString() : MINI_CHART_ASSETS[1].price, change: nqQuote ? nqQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[1].change, dir: ((nqQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
     { id: 'GCUSD' as const, label: '골드(GLD)', price: gcQuote ? gcQuote.price.toLocaleString() : MINI_CHART_ASSETS[2].price, change: gcQuote ? gcQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[2].change, dir: ((gcQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
     { id: 'CLUSD' as const, label: 'WTI(USO)', price: clQuote ? clQuote.price.toLocaleString() : MINI_CHART_ASSETS[3].price, change: clQuote ? clQuote.changesPercentage.toFixed(2) : MINI_CHART_ASSETS[3].change, dir: ((clQuote?.changesPercentage ?? 0) >= 0 ? 'buy' : 'sell') as 'buy' | 'sell' },
-    { id: 'KOSPI' as const, label: '코스피선물', price: '2,650.30', change: '+0.00', dir: 'buy' as const },
   ];
 
   const activeLiveAsset = liveAssets.find(a => a.id === activeMiniAsset) || liveAssets[0];
@@ -343,8 +341,8 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     // ── @시그널 멘션 → 시그널 봇 Mock 응답 ─────────────
     if (userMsg.includes('@시그널')) {
       const assetInfo = MINI_CHART_ASSETS.find(a => a.id === activeMiniAsset);
-      const entryPrice = activeMiniAsset === 'K200' ? '385.50' : activeMiniAsset === 'NQUSD' ? '21,210.50' : activeMiniAsset === 'GCUSD' ? '4,810.20' : activeMiniAsset === 'CLUSD' ? '64.50' : '2,645.00';
-      const targetPrice = activeMiniAsset === 'K200' ? '390.00' : activeMiniAsset === 'NQUSD' ? '21,450.00' : activeMiniAsset === 'GCUSD' ? '4,880.00' : activeMiniAsset === 'CLUSD' ? '66.20' : '2,680.00';
+      const entryPrice = activeMiniAsset === 'KOSPI' ? '2,645.00' : activeMiniAsset === 'NQUSD' ? '21,210.50' : activeMiniAsset === 'GCUSD' ? '4,810.20' : '64.50';
+      const targetPrice = activeMiniAsset === 'KOSPI' ? '2,680.00' : activeMiniAsset === 'NQUSD' ? '21,450.00' : activeMiniAsset === 'GCUSD' ? '4,880.00' : '66.20';
       const direction = assetInfo?.dir === 'buy' ? '매수' : '매도';
       const confidence = 76;
 
@@ -799,15 +797,13 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
           <p className="text-[10px] leading-relaxed" style={{ color: '#888' }}>
             {signalResult?.confidence
               ? `${currentAsset.label} AI 시그널 분석 완료. 신뢰도 ${signalResult.confidence}%. 진입가 ${signalResult.entryPrice?.toLocaleString() ?? '-'} → 목표가 ${signalResult.targetPrice?.toLocaleString() ?? '-'}`
-              : activeMiniAsset === 'K200'
-              ? 'K200선물 박스권 등락. 385선 지지 확인, 390선 돌파 시 상승 추세 전환 가능. AI 분석으로 진입가/목표가를 확인하세요.'
+              : activeMiniAsset === 'KOSPI'
+              ? '코스피선물 지수 2650선 지지 테스트 중. AI 분석으로 진입가/목표가를 확인하세요.'
               : activeMiniAsset === 'NQUSD'
               ? '나스닥(QQQ) 상승 모멘텀 유지. RSI 58 중립권, 추가 상승 시 돌파 가능. AI 분석 버튼으로 상세 시그널을 확인하세요.'
               : activeMiniAsset === 'GCUSD'
               ? '골드(GLD) 강세 지속. 중앙은행 매수세 + 지정학 리스크 수혜. AI 분석으로 진입가/목표가를 확인하세요.'
-              : activeMiniAsset === 'CLUSD'
-              ? 'WTI(USO) 단기 조정 후 반등. OPEC+ 감산 연장 호재. AI 분석으로 매수/매도 시그널을 확인하세요.'
-              : '코스피선물 2,650선 지지 테스트 중. 외인 순매수 확인, AI 분석으로 상세 시그널을 확인하세요.'}
+              : 'WTI(USO) 단기 조정 후 반등. OPEC+ 감산 연장 호재. AI 분석으로 매수/매도 시그널을 확인하세요.'}
           </p>
         </div>
 

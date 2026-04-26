@@ -1,68 +1,31 @@
-// Market Data Client — FMP (Primary) + Twelve Data (Fallback)
+// Market Data Client — FMP (Primary) + Mock (Fallback)
 // SERVER ONLY: API Route(route.ts)에서만 임포트
 
 import { Quote, NewsItem, CandleData, FearGreedIndex } from './types';
 
 // ─── API Keys ───
-const FMP_API_KEY = process.env.FMP_API_KEY || '';
+const FMP_API_KEY=process.env.FMP_API_KEY || '';
 const FMP_BASE = 'https://financialmodelingprep.com/stable';
-const TD_API_KEY = process.env.TWELVE_DATA_API_KEY || '';
-const TD_BASE = 'https://api.twelvedata.com';
-const TD_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
-// ─── 심볼 매핑: 우리 내부 심볼 ↔ 각 API 심볼 ───
+// ─── 심볼 매핑: 내부 심볼 ↔ FMP 심볼 ───
 const INTERNAL_TO_FMP: Record<string, string> = {
-  NQUSD: 'QQQ', GCUSD: 'GLD', CLUSD: 'USO', K200: 'K200', KOSPI: '^KS11',
+  NQUSD: 'QQQ', GCUSD: 'GLD', CLUSD: 'USO', KOSPI: '^KS11',
   AAPL: 'AAPL', NVDA: 'NVDA', TSLA: 'TSLA',
   META: 'META', MSFT: 'MSFT', AMZN: 'AMZN', SPY: 'SPY', QQQ: 'QQQ',
-};
-
-const INTERNAL_TO_TD: Record<string, string> = {
-  NQUSD: 'QQQ',   // 나스닥 100 ETF
-  GCUSD: 'GLD',   // 골드 ETF
-  CLUSD: 'USO',   // WTI 원유 ETF
-  K200: 'K200',   // 코스피 200 선물
-  KOSPI: '^KS11', // 코스피 지수
-  AAPL: 'AAPL', NVDA: 'NVDA', TSLA: 'TSLA',
-  META: 'META', MSFT: 'MSFT', AMZN: 'AMZN', SPY: 'SPY', QQQ: 'QQQ',
-};
-
-const TD_LABEL_MAP: Record<string, string> = {
-  QQQ: '나스닥 100 ETF', GLD: '골드 ETF', USO: 'WTI 원유 ETF',
-  K200: '코스피 200 선물', '^KS11': '코스피 지수',
-};
-
-// ─── Timeframe 매핑: 우리 내부 ↔ Twelve Data ───
-const TF_TO_TD: Record<string, string> = {
-  '1min': '1min', '5min': '5min', '15min': '15min',
-  '30min': '30min', '1hour': '1h', '1day': '1day',
 };
 
 // ═══════════════════════════════════════════════════════════
 //  실시간 시세 (Quote)
 // ═══════════════════════════════════════════════════════════
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
-  // 1) FMP 시도
   if (FMP_API_KEY) {
     try {
       const results = await fmpGetQuotes(symbols);
       if (results.length > 0) return results;
     } catch (e) {
-      console.warn('[FMP] getQuotes 실패, Twelve Data 폴백:', e);
+      console.warn('[FMP] getQuotes 실패, mock 폴백:', e);
     }
   }
-
-  // 2) Twelve Data 폴백
-  if (TD_API_KEY) {
-    try {
-      const results = await tdGetQuotes(symbols);
-      if (results.length > 0) return results;
-    } catch (e) {
-      console.warn('[TD] getQuotes 실패, mock 폴백:', e);
-    }
-  }
-
-  // 3) Mock
   return getMockQuotes(symbols);
 }
 
@@ -101,45 +64,6 @@ async function fmpGetQuotes(symbols: string[]): Promise<Quote[]> {
   return results.filter((r): r is Quote => r !== null);
 }
 
-// Twelve Data: 일괄 quote 조회 (API 호출 1회)
-async function tdGetQuotes(symbols: string[]): Promise<Quote[]> {
-  const tdSymbols = symbols.map(s => INTERNAL_TO_TD[s] || s).join(',');
-  const url = `${TD_BASE}/quote?symbol=${tdSymbols}&apikey=${TD_API_KEY}`;
-  const req = new Request(url, { headers: { 'User-Agent': TD_UA }, cache: 'no-store' });
-  const res = await fetch(req);
-  if (!res.ok) throw new Error(`TD quote error: ${res.status}`);
-  const data = await res.json();
-
-  // 단일 심볼이면 배열로 감싸기
-  const items = Array.isArray(data) ? data : [data];
-
-  return items.map((raw: Record<string, unknown>) => {
-    const sym = (raw.symbol as string) || '';
-    // Twelve Data 심볼 → 내부 심볼 역매핑
-    const internalSym = Object.entries(INTERNAL_TO_TD).find(([, v]) => v === sym)?.[0] || sym;
-    return {
-      symbol: internalSym,
-      price: Number(raw.close) || Number(raw.price) || 0,
-      changesPercentage: Number(raw.percent_change) || 0,
-      change: Number(raw.change) || 0,
-      dayLow: Number(raw.low) || 0,
-      dayHigh: Number(raw.high) || 0,
-      yearHigh: Number(raw.fifty_two_week_high) || 0,
-      yearLow: Number(raw.fifty_two_week_low) || 0,
-      marketCap: 0,
-      priceAvg50: 0,
-      priceAvg200: 0,
-      volume: Number(raw.volume) || 0,
-      avgVolume: Number(raw.avg_volume) || 0,
-      exchange: (raw.exchange as string) || '',
-      open: Number(raw.open) || 0,
-      previousClose: Number(raw.previous_close) || 0,
-      eps: 0,
-      pe: Number(raw.pe_ratio) || 0,
-    } as Quote;
-  });
-}
-
 // ═══════════════════════════════════════════════════════════
 //  차트 데이터 (Candlestick)
 // ═══════════════════════════════════════════════════════════
@@ -147,23 +71,12 @@ export async function getHistoricalChart(
   symbol: string,
   timeframe = '30min'
 ): Promise<CandleData[]> {
-  // 1) FMP 시도
   if (FMP_API_KEY) {
     try {
       const data = await fmpGetChart(symbol, timeframe);
       if (data.length > 0) return data;
     } catch (e) {
-      console.warn('[FMP] chart 실패, Twelve Data 폴백:', e);
-    }
-  }
-
-  // 2) Twelve Data 폴백
-  if (TD_API_KEY) {
-    try {
-      const data = await tdGetChart(symbol, timeframe);
-      if (data.length > 0) return data;
-    } catch (e) {
-      console.warn('[TD] chart 실패, mock 폴백:', e);
+      console.warn('[FMP] chart 실패, mock 폴백:', e);
     }
   }
 
@@ -208,47 +121,23 @@ async function fmpGetChart(symbol: string, timeframe: string): Promise<CandleDat
   return candles;
 }
 
-async function tdGetChart(symbol: string, timeframe: string): Promise<CandleData[]> {
-  const tdSym = INTERNAL_TO_TD[symbol] || symbol;
-  const tdInterval = TF_TO_TD[timeframe] || '15min';
-
-  // Twelve Data: 최대 5000개 캔들 가능, 100개만 가져오기
-  const url = `${TD_BASE}/time_series?symbol=${tdSym}&interval=${tdInterval}&outputsize=100&apikey=${TD_API_KEY}`;
-  const req = new Request(url, { headers: { 'User-Agent': TD_UA }, cache: 'no-store' });
-  const res = await fetch(req);
-  if (!res.ok) throw new Error(`TD chart error: ${res.status}`);
-  const data = await res.json();
-
-  const values = data.values;
-  if (!Array.isArray(values) || values.length === 0) throw new Error('No chart data');
-
-  const candles: CandleData[] = values.reverse().map((v: Record<string, string>) => ({
-    timestamp: new Date(v.datetime + 'Z').getTime(),
-    open: Number(v.open), high: Number(v.high),
-    low: Number(v.low), close: Number(v.close), volume: Number(v.volume),
-  }));
-
-  return candles;
-}
-
 // ═══════════════════════════════════════════════════════════
-//  뉴스 (FMP 전용 — Twelve Data에 대체 없음)
+//  뉴스 (FMP 전용)
 // ═══════════════════════════════════════════════════════════
 export async function getNews(symbol = ''): Promise<NewsItem[]> {
   if (!FMP_API_KEY) return getMockNews();
 
   try {
-    // tick=timestamp로 항상 새 데이터 강제 (FMP CDN 우회)
     const tick = Date.now();
     const url = symbol
-      ? `${FMP_BASE}/news?symbol=${symbol}&limit=20&apikey=${FMP_API_KEY}&_t=${tick}`
-      : `${FMP_BASE}/news?limit=20&apikey=${FMP_API_KEY}&_t=${tick}`;
+      ? `${FMP_BASE}/news?symbol=${symbol}&limit=30&apikey=${FMP_API_KEY}&_t=${tick}`
+      : `${FMP_BASE}/news?limit=30&apikey=${FMP_API_KEY}&_t=${tick}`;
     const res = await fetch(url, { cache: 'no-store' } as RequestInit);
     if (!res.ok) throw new Error(`FMP News error: ${res.status}`);
     const data = await res.json();
     if (!Array.isArray(data)) return getMockNews();
 
-    return data.slice(0, 10).map((item: Record<string, string>) => ({
+    return data.slice(0, 20).map((item: Record<string, string>) => ({
       symbol: item.symbol || '',
       publishedDate: item.publishedDate || new Date().toISOString(),
       title: item.title || '',
@@ -264,7 +153,7 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Fear & Greed Index (CNN Markets — 변경 없음)
+//  Fear & Greed Index (CNN Markets)
 // ═══════════════════════════════════════════════════════════
 const CNN_FG_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
 const CNN_FG_HEADERS: Record<string, string> = {
@@ -332,7 +221,6 @@ export function getMockQuotes(symbols: string[]): Quote[] {
     'GCUSD': { price: 4814.7, changesPercentage: 0.13, change: 6.4, dayLow: 4785.9, dayHigh: 4827.2, yearHigh: 5626.8, yearLow: 3123.3, marketCap: 0, priceAvg50: 4891.3, priceAvg200: 4377.5, volume: 28029, avgVolume: 25000, exchange: 'COMMODITY', open: 4811.8, previousClose: 4808.3, eps: 0, pe: 0 },
     'NQUSD': { price: 21285.5, changesPercentage: 0.42, change: 89.2, dayLow: 21150, dayHigh: 21320, yearHigh: 22500, yearLow: 18500, marketCap: 0, priceAvg50: 20800, priceAvg200: 19500, volume: 150000, avgVolume: 120000, exchange: 'COMMODITY', open: 21200, previousClose: 21196.3, eps: 0, pe: 0 },
     'CLUSD': { price: 64.8, changesPercentage: -0.35, change: -0.23, dayLow: 64.2, dayHigh: 65.1, yearHigh: 82.5, yearLow: 55.0, marketCap: 0, priceAvg50: 67.5, priceAvg200: 71.2, volume: 250000, avgVolume: 220000, exchange: 'COMMODITY', open: 65.03, previousClose: 65.03, eps: 0, pe: 0 },
-    'K200': { price: 385.5, changesPercentage: 0.55, change: 2.1, dayLow: 383.0, dayHigh: 387.2, yearHigh: 420.0, yearLow: 340.0, marketCap: 0, priceAvg50: 380.0, priceAvg200: 360.0, volume: 120000, avgVolume: 100000, exchange: 'KRX', open: 383.5, previousClose: 383.4, eps: 0, pe: 0 },
     'KOSPI': { price: 2650.3, changesPercentage: 0.38, change: 10.1, dayLow: 2635.0, dayHigh: 2665.0, yearHigh: 2800.0, yearLow: 2400.0, marketCap: 0, priceAvg50: 2620.0, priceAvg200: 2550.0, volume: 800000, avgVolume: 750000, exchange: 'KRX', open: 2640.2, previousClose: 2640.2, eps: 0, pe: 0 },
     'AAPL': { price: 263.4, changesPercentage: 1.23, change: 3.2, dayLow: 260.0, dayHigh: 264.5, yearHigh: 270.0, yearLow: 200.0, marketCap: 4000000000000, priceAvg50: 255.0, priceAvg200: 240.0, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 260.5, previousClose: 260.2, eps: 6.58, pe: 40.0 },
     'NVDA': { price: 198.35, changesPercentage: 3.45, change: 6.6, dayLow: 192.0, dayHigh: 200.5, yearHigh: 210.0, yearLow: 100.0, marketCap: 4800000000000, priceAvg50: 185.0, priceAvg200: 160.0, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 191.8, previousClose: 191.7, eps: 3.20, pe: 61.8 },
@@ -371,7 +259,6 @@ export function getMockChartData(symbol = 'GCUSD'): CandleData[] {
     'NQUSD': { basePrice: 21285, volatility: 15 },
     'GCUSD': { basePrice: 4810, volatility: 4 },
     'CLUSD': { basePrice: 64.8, volatility: 0.3 },
-    'K200': { basePrice: 385.5, volatility: 0.8 },
     'KOSPI': { basePrice: 2650, volatility: 5 },
   };
   const { basePrice, volatility } = config[symbol] || config['GCUSD'];

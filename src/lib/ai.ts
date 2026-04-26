@@ -7,11 +7,10 @@ import { AiSignalResult, WebSearchResult, getPredictionType } from './types';
 
 // ETF 심볼 매핑 (AI 프롬프트에서 ETF 이름 표시용)
 const ETF_MAP: Record<string, string> = {
-  K200: '',
+  KOSPI: '',
   NQUSD: 'QQQ',
   GCUSD: 'GLD',
   CLUSD: 'USO',
-  KOSPI: '',
 };
 
 // ===== API Keys =====
@@ -50,8 +49,8 @@ const SIGNAL_SYSTEM_PROMPT = `너는 한국 전문 트레이더 AI 분석가야.
 - confidence 70 이상일 때만 LONG/SHORT 제공
 |- riskRewardRatio = |targetPrice - entryPrice| / |entryPrice - stopLoss|
 |- 단기(1분/5분)는 "다음 봉 예측", 중장기(15분 이상)는 "현재봉 마감"
-|- 국내선물(K200, KOSPI)은 한국 시장 기준, 해외선물(NQ/GC/CL)은 미국 시장 기준으로 분석
-|- 국내선물 가격은 USD가 아닌 KRW 기준(K200=385.50, KOSPI=2650.30)으로 계산`;
+|- 국내선물(KOSPI)은 한국 시장 기준, 해외선물(NQ/GC/CL)은 미국 시장 기준으로 분석
+|- 국내선물 가격은 USD가 아닌 KRW 기준(KOSPI=2650.30)으로 계산`;
 
 function buildUserPrompt(
   symbol: string,

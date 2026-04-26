@@ -125,24 +125,64 @@ export async function GET(req: NextRequest) {
 
   // ── 1. FMP 뉴스 ──────────────────────────────────────
   let fmpNews: NewsItem[] = [];
+  let fmpNewsAll: NewsItem[] = [];
   try {
     fmpNews = await getNews(symbol);
+    // 추가 종목별 뉴스 병렬 수집
+    if (!symbol) {
+      const extraSymbols = ['NVDA', 'AAPL', 'TSLA', 'META', 'CLUSD', 'GCUSD'];
+      const extraResults = await Promise.allSettled(
+        extraSymbols.map(s => getNews(s))
+      );
+      fmpNewsAll = [
+        ...fmpNews,
+        ...extraResults
+          .filter(r => r.status === 'fulfilled')
+          .flatMap(r => (r as PromiseFulfilledResult<NewsItem[]>).value),
+      ];
+      // 중복 제거 (title로)
+      const seenTitles = new Set<string>();
+      fmpNewsAll = fmpNewsAll.filter(n => {
+        const key = n.title.slice(0, 50);
+        if (seenTitles.has(key)) return false;
+        seenTitles.add(key);
+        return true;
+      });
+    }
   } catch {}
+  // fmpNews = fmpNewsAll 길면 사용
+  if (fmpNewsAll.length > 0) fmpNews = fmpNewsAll;
 
   // ── 2. 웹검색 & GDELT 보강 ────────────────────────────
   let webResults: WebSearchResult[] = [];
   let gdeltNews: NewsItem[] = [];
   try {
     if (mode === 'breaking') {
-      if (fmpNews.length < 5) gdeltNews = await getGdeltNews();
+      if (fmpNews.length < 10) gdeltNews = await getGdeltNews();
       const now = new Date();
       const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      webResults = await webSearch(
-        `시장 뉴스 Fed 금리 원유 골드 나스닥 비트코인 ${dateStr}`,
-        20
-      );
+      // 여러 검색어를 병렬로 실행해서 더 많은 뉴스 수집
+      const searchTasks = [
+        webSearch(`시장 뉴스 Fed 금리 원유 골드 나스닥 비트코인 ${dateStr}`, 10),
+        webSearch(`글로벌 경제 주요 뉴스 ${dateStr}`, 10),
+        webSearch(`stock market news today ${dateStr}`, 10),
+        webSearch(`breaking financial news commodities ${dateStr}`, 10),
+      ];
+      const searchResults = await Promise.allSettled(searchTasks);
+      webResults = searchResults
+        .filter(r => r.status === 'fulfilled')
+        .flatMap(r => (r as PromiseFulfilledResult<WebSearchResult[]>).value)
+        .filter((r, i, arr) => arr.findIndex(x => x.title?.slice(0,40) === r.title?.slice(0,40)) === i);
     } else if (category) {
-      webResults = await searchMarketNews(category as 'macro' | 'commodity' | 'tech' | 'crypto');
+      const ct = category as 'macro' | 'commodity' | 'tech' | 'crypto';
+      webResults = await searchMarketNews(ct);
+      // 같은 카테고리로 추가 검색
+      const extraQuery = ct === 'macro' ? '미국 경제 지표 뉴스' :
+        ct === 'commodity' ? '원자재 가격 동향' :
+        ct === 'tech' ? '테크 기업 실적 뉴스' : '가상자산 시장 뉴스';
+      const extraResults = await webSearch(extraQuery, 8);
+      webResults = [...webResults, ...extraResults]
+        .filter((r, i, arr) => arr.findIndex(x => x.title?.slice(0,40) === r.title?.slice(0,40)) === i);
     } else if (symbol) {
       const label = searchParams.get('label') || symbol;
       webResults = await searchFinancialNews(symbol, label);
