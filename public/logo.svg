@@ -1,0 +1,30 @@
+<svg id="ai-signaltalk-logo-v2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 48" width="200" height="48" fill="none" role="img" aria-label="AI 시그널톡">
+  <defs>
+    <linearGradient id="graphGradient" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#00C030" />
+      <stop offset="100%" stop-color="#00FF41" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- 막대 3개 (좌→우 상승) -->
+  <rect x="5" y="26" width="6" height="14" rx="1" fill="url(#graphGradient)" filter="url(#glow)" />
+  <rect x="16" y="20" width="6" height="20" rx="1" fill="url(#graphGradient)" filter="url(#glow)" />
+  <rect x="27" y="10" width="6" height="30" rx="1" fill="url(#graphGradient)" filter="url(#glow)" />
+
+  <!-- 상승 꺾은선 -->
+  <polyline points="8,26 19,20 30,10" fill="none" stroke="#00FF41" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)" />
+  <polygon points="30,10 35,15 30,12" fill="#00FF41" />
+
+  <!-- "AI" 텍스트 -->
+  <text x="48" y="34" font-family="Inter, -apple-system, 'Segoe UI', sans-serif" font-size="22" font-weight="800" fill="#FFFFFF" letter-spacing="1">AI</text>
+
+  <!-- "시그널톡" 텍스트 -->
+  <text x="81" y="34" font-family="Inter, -apple-system, 'Segoe UI', 'Noto Sans KR', sans-serif" font-size="20" font-weight="700" fill="#FFFFFF" letter-spacing="-0.5">시그널톡</text>
+</svg>
