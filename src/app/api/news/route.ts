@@ -1,77 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getNews } from '@/lib/fmp';
-import { webSearch, searchMarketNews, searchFinancialNews, translateNewsToKorean } from '@/lib/zai-web-search';
-import type { NewsItem, WebSearchResult } from '@/lib/types';
-
-/** 출처별 기본 URL 매핑 */
-const SOURCE_DEFAULT_URLS: Record<string, string> = {
-  reuters: 'https://www.reuters.com',
-  bloomberg: 'https://www.bloomberg.com',
-  cnbc: 'https://www.cnbc.com',
-  'market watch': 'https://www.marketwatch.com',
-  'investing.com': 'https://www.investing.com',
-  yahoo: 'https://finance.yahoo.com',
-};
-
-function getDefaultUrl(source: string): string {
-  const lower = source.toLowerCase();
-  for (const [key, url] of Object.entries(SOURCE_DEFAULT_URLS)) {
-    if (lower.includes(key)) return url;
-  }
-  return '';
-}
-
-// ═══════════════════════════════════════════════════════════
-//  강화된 URL 매칭 — 제목으로 실제 기사 URL 찾기
-// ═══════════════════════════════════════════════════════════
-function findExactUrl(title: string, webResults: WebSearchResult[]): string {
-  const lowerTitle = title.toLowerCase().replace(/[^a-z0-9가-힣\s]/g, '').trim();
-
-  // 1) 정확한 제목 매칭 (공백/특수문자 제거 후)
-  for (const r of webResults) {
-    if (!r.url) continue;
-    const lowerRes = (r.title || '').toLowerCase().replace(/[^a-z0-9가-힣\s]/g, '').trim();
-    if (lowerRes === lowerTitle) return r.url;
-  }
-
-  // 2) 제목 첫 50자 매칭
-  for (const r of webResults) {
-    if (!r.url) continue;
-    const rKey = (r.title || '').toLowerCase().slice(0, 50);
-    const tKey = title.toLowerCase().slice(0, 50);
-    if (rKey === tKey) return r.url;
-  }
-
-  // 3) 한글 제목 → 웹검색 결과에서 제목이 포함된 URL 찾기 (앞 30자 일치)
-  for (const r of webResults) {
-    if (!r.url) continue;
-    if ((r.title || '').toLowerCase().includes(title.toLowerCase().slice(0, 30))) return r.url;
-    if (title.toLowerCase().includes((r.title || '').toLowerCase().slice(0, 30))) return r.url;
-  }
-
-  return '';
-}
-
-function ensureValidUrl(item: NewsItem, webResults: WebSearchResult[]): string {
-  // 이미 유효한 URL이면 그대로 사용
-  if (item.url && item.url !== '#' && item.url !== '' && item.url.startsWith('http')) return item.url;
-
-  // 웹검색 결과에서 제목으로 실제 URL 찾기
-  const matched = findExactUrl(item.title, webResults);
-  if (matched) return matched;
-
-  // 찾지 못함 → 이 뉴스는 표시 불가
-  return '';
-}
-
-function ensureUrl(item: NewsItem, webResults: WebSearchResult[]): NewsItem {
-  if (item.url && item.url !== '#' && item.url !== '' && item.url.startsWith('http')) return item;
-  const matched = findExactUrl(item.title, webResults);
-  if (matched) return { ...item, url: matched };
-  const defUrl = getDefaultUrl(item.source);
-  if (defUrl) return { ...item, url: defUrl };
-  return item;
-}
+import { fetchBloombergNews, fetchSeekingAlphaNews, fetchYahooNews } from '@/lib/rss-news';
+import { translateNewsToKorean } from '@/lib/zai-web-search';
+import type { NewsItem } from '@/lib/types';
 
 // ═══════════════════════════════════════════════════════════
 //  GDELT 뉴스 가져오기
@@ -156,96 +86,39 @@ function calcImpact(title: string, text: string): number {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const symbol = searchParams.get('symbol') || '';
-  const category = searchParams.get('category') || '';
+  const category = searchParams.get('category') || ''; // 인터페이스 유지
   const mode = searchParams.get('mode') || 'column';
+  void category;
 
-  // ── 1. FMP 뉴스 (종목별 병렬 수집) ────────────────
-  let allFmpNews: NewsItem[] = [];
-  try {
-    const symbolsToFetch = symbol
-      ? [symbol]
-      : ['', 'NVDA', 'AAPL', 'TSLA', 'META', 'GCUSD', 'CLUSD', 'MSFT', 'AMZN', 'GOOGL'];
+  // ── 1. RSS + GDELT 병렬 수집 ────────────────────────
+  const results = await Promise.allSettled([
+    fetchYahooNews(),
+    fetchBloombergNews(),
+    fetchSeekingAlphaNews(),
+    getGdeltNews(),
+  ]);
 
-    const results = await Promise.allSettled(
-      symbolsToFetch.map(s => getNews(s))
-    );
+  const collected: NewsItem[] = results
+    .filter((r): r is PromiseFulfilledResult<NewsItem[]> => r.status === 'fulfilled')
+    .flatMap((r) => r.value);
 
-    allFmpNews = results
-      .filter(r => r.status === 'fulfilled')
-      .flatMap(r => (r as PromiseFulfilledResult<NewsItem[]>).value);
+  // ── 2. 병합 + URL 기준 중복 제거 ─────────────────────
+  const merged = collected
+    .map((item) => ({
+      ...item,
+      symbol: symbol || item.symbol || 'MARKET',
+    }))
+    .filter((item) => item.title && item.url);
 
-    // 제목 기반 중복 제거
-    const seen = new Set<string>();
-    allFmpNews = allFmpNews.filter(n => {
-      const key = n.title.slice(0, 50);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  } catch {}
-
-  // ── 2. 웹검색 & GDELT 보강 ──────────────────────────
-  let webResults: WebSearchResult[] = [];
-  let gdeltNews: NewsItem[] = [];
-  try {
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    if (mode === 'breaking') {
-      if (allFmpNews.length < 10) gdeltNews = await getGdeltNews();
-      const searchTasks = [
-        webSearch(`시장 뉴스 Fed 금리 원유 골드 나스닥 비트코인 ${dateStr}`, 10),
-        webSearch(`글로벌 경제 주요 뉴스 ${dateStr}`, 10),
-        webSearch(`stock market news today ${dateStr}`, 10),
-        webSearch(`breaking financial news commodities ${dateStr}`, 10),
-      ];
-      const searchResults = await Promise.allSettled(searchTasks);
-      webResults = searchResults
-        .filter(r => r.status === 'fulfilled')
-        .flatMap(r => (r as PromiseFulfilledResult<WebSearchResult[]>).value)
-        .filter((r, i, arr) => arr.findIndex(x => x.title?.slice(0, 40) === r.title?.slice(0, 40)) === i)
-        .filter(r => r.url && r.url.startsWith('http'));
-    } else if (category) {
-      const ct = category as 'macro' | 'commodity' | 'tech' | 'crypto';
-      webResults = await searchMarketNews(ct);
-      const extraQuery = ct === 'macro' ? '미국 경제 지표 뉴스' :
-        ct === 'commodity' ? '원자재 가격 동향' :
-        ct === 'tech' ? '테크 기업 실적 뉴스' : '가상자산 시장 뉴스';
-      const extraResults = await webSearch(extraQuery, 8);
-      webResults = [...webResults, ...extraResults]
-        .filter((r, i, arr) => arr.findIndex(x => x.title?.slice(0, 40) === r.title?.slice(0, 40)) === i)
-        .filter(r => r.url && r.url.startsWith('http'));
-    } else if (symbol) {
-      const label = searchParams.get('label') || symbol;
-      webResults = await searchFinancialNews(symbol, label);
-      webResults = webResults.filter(r => r.url && r.url.startsWith('http'));
-    } else {
-      webResults = await webSearch(`글로벌 경제 뉴스 Fed 금리 원유 골드 나스닥 AI 비트코인 ${dateStr}`, 20);
-      webResults = webResults.filter(r => r.url && r.url.startsWith('http'));
-    }
-  } catch {}
-
-  const webNewsItems: NewsItem[] = webResults.map((r) => ({
-    symbol: symbol || 'MARKET',
-    publishedDate: r.publishedDate || new Date().toISOString(),
-    title: r.title,
-    text: r.snippet || '',
-    source: r.siteName || '',
-    image: '',
-    url: r.url,
-  }));
-
-  // ── 3. 병합 + 중복 제거 ─────────────────────────────
-  const allNews = [...allFmpNews, ...webNewsItems, ...gdeltNews];
   const seenUrls = new Set<string>();
-  const uniqueNews = allNews.filter((n) => {
-    if (!n.url || n.url === '#') return false; // URL 없는 뉴스는 아예 제외
+  const uniqueNews = merged.filter((n) => {
+    if (!n.url || n.url === '#') return false;
     if (seenUrls.has(n.url)) return false;
     seenUrls.add(n.url);
     return true;
   });
 
-  // ── 4. Breaking 모드: 시장 영향 뉴스만 선별 ─────────
+  // ── 3. Breaking 모드: 시장 영향 뉴스만 선별 ─────────
   let filteredNews = uniqueNews;
   if (mode === 'breaking') {
     const scored = uniqueNews
@@ -255,17 +128,14 @@ export async function GET(req: NextRequest) {
     filteredNews = scored.length > 0 ? scored.slice(0, 20) : uniqueNews.slice(0, 15);
   }
 
-  // ── 4. URL 보강 (번역 전 원본 제목 기준) ────────────
-  const urlEnriched = filteredNews.map((item) => ensureUrl(item, webResults));
+  // ── 4. 한국어 번역 ──────────────────────────────────
+  const translatedNews = await translateNewsToKorean(filteredNews);
 
-  // ── 5. 한국어 번역 ──────────────────────────────────
-  const translatedNews = await translateNewsToKorean(urlEnriched);
-
-  // ── 6. URL 최종 검증 — 유효한 URL만 남김 ────────────
+  // ── 5. URL 최종 검증 — 유효한 URL만 남김 ────────────
   const enriched = translatedNews
-    .filter((item) => item.url && item.url !== '#' && item.url.startsWith('http'));
+    .filter((item) => item.url && item.url.startsWith('http'));
 
-  // ── 7. 캐시 ──────────────────────────────────────────
+  // ── 6. 캐시 ──────────────────────────────────────────
   const cacheMaxAge = mode === 'breaking' ? 300 : 3600;
 
   return NextResponse.json(enriched.slice(0, 20), {
