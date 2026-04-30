@@ -20,23 +20,36 @@ export default function SignalChartLogo({
         style={{ flexShrink: 0 }}
       >
         <defs>
-          <linearGradient id="signalTalk" x1="8" y1="44" x2="40" y2="4" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#00FF41" stopOpacity="0.75" />
-            <stop offset="100%" stopColor="#00FF41" />
+          <linearGradient id="candle" x1="0" y1="48" x2="0" y2="0">
+            <stop offset="0" stopColor="#00C030" />
+            <stop offset="1" stopColor="#00FF41" />
+          </linearGradient>
+          <linearGradient id="trend" x1="12" y1="34" x2="38" y2="10">
+            <stop offset="0" stopColor="#00C030" />
+            <stop offset="1" stopColor="#00FF41" />
           </linearGradient>
           <filter id="glow" x="-40%" y="-40%" width="180%" height="180%" colorInterpolationFilters="sRGB">
-            <feGaussianBlur stdDeviation="2.4" result="blur" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
-        <g filter="url(#glow)">
-          <path
-            fill="url(#signalTalk)"
-            d="M12 12H28l3-5.5L38.5 14H39c4 0 7 3 7 7v7c0 6-4.7 10-11 10h-8.5L17 44v-6H12c-6 0-10-4.5-10-10v-6c0-6 4.5-10 10-10Z"
-          />
+        <rect x="8" y="14" width="32" height="24" rx="4" fill="rgba(255,255,255,0.04)" />
+        <g stroke="url(#candle)" strokeLinecap="round">
+          <line x1="14" y1="18" x2="14" y2="32" strokeWidth="1.5" />
+          <line x1="23" y1="14" x2="23" y2="31" strokeWidth="1.5" />
+          <line x1="32" y1="12" x2="32" y2="29" strokeWidth="1.5" />
+        </g>
+        <g fill="url(#candle)">
+          <rect x="11" y="22" width="6" height="10" rx="1" />
+          <rect x="20" y="19" width="6" height="12" rx="1" />
+          <rect x="29" y="16" width="6" height="13" rx="1" />
+        </g>
+        <g filter="url(#glow)" stroke="url(#trend)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 33.5 L20 29 L28 24 L36 16" fill="none" />
+          <path d="M36 16 L33 16.8 L38.5 12" fill="none" />
         </g>
       </svg>
 
