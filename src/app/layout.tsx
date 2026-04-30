@@ -15,6 +15,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko" className="dark">
+      <head>
+        <link rel="stylesheet" href="https://static.toss.im/tps/main.css" />
+        <link rel="stylesheet" href="https://static.toss.im/tps/others.css" />
+      </head>
       <body className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
         <QueryProvider>
           <Toaster

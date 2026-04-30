@@ -24,7 +24,7 @@
   body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Space Grotesk', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Toss Product Sans', 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
 

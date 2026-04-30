@@ -56,7 +56,7 @@ export default function SignalChartLogo({
       {showText && (
         <span
           className="whitespace-nowrap select-none"
-          style={{ fontFamily: "'Space Grotesk', 'Pretendard', sans-serif", color: '#fff', fontSize, fontWeight: 500, letterSpacing: '-0.02em', lineHeight: 1 }}
+          style={{ fontFamily: "'Toss Product Sans', 'Pretendard', sans-serif", color: '#fff', fontSize, fontWeight: 500, letterSpacing: '-0.02em', lineHeight: 1 }}
         >
           <span style={{ color: '#00FF41', fontWeight: 700 }}>AI</span> 시그널톡
         </span>
