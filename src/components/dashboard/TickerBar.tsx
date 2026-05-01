@@ -25,6 +25,8 @@ const SYMBOL_LABEL_MAP: Record<string, string> = {
   NQUSD: '나스닥선물',
   GCUSD: '골드선물',
   CLUSD: 'WTI선물',
+  KOSPI: '코스피선물',
+  HSIUSD: '항셍선물',
   AAPL: '애플',
   NVDA: '엔비디아',
   TSLA: '테슬라',

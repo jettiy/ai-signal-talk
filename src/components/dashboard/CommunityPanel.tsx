@@ -5,6 +5,7 @@ import {
   Bot,
   Clock,
   Flame,
+  Hash,
   Loader2,
   MessageCircle,
   Newspaper,
@@ -18,7 +19,7 @@ import {
 import { useMarketData } from '@/hooks/useMarketData';
 import { useNews } from '@/hooks/useNews';
 
-type AssetId = 'KOSPI' | 'NQUSD' | 'GCUSD' | 'CLUSD';
+type AssetId = 'KOSPI' | 'NQUSD' | 'GCUSD' | 'CLUSD' | 'HSIUSD';
 type TimeframeId = '1min' | '5min' | '15min' | '30min' | '1hour' | '1day';
 type SocketStatus = 'authenticating' | 'connecting' | 'open' | 'closed';
 
@@ -29,6 +30,7 @@ interface ChatMessage {
   time: string;
   mine?: boolean;
   system?: boolean;
+  isPrivate?: boolean;
 }
 
 interface NewsItem {
@@ -51,6 +53,12 @@ interface SignalResult {
   rationale?: string;
 }
 
+interface Channel {
+  id: number;
+  name: string;
+  symbol: string | null;
+}
+
 const BACKEND_HTTP_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ai-signal-talk-backend.onrender.com';
 
@@ -59,6 +67,16 @@ const ASSETS: Array<{ id: AssetId; label: string; short: string; fallbackPrice: 
   { id: 'NQUSD', label: '나스닥선물', short: 'NQ', fallbackPrice: 21285.5 },
   { id: 'GCUSD', label: '골드선물', short: 'GOLD', fallbackPrice: 4821.3 },
   { id: 'CLUSD', label: 'WTI선물', short: 'WTI', fallbackPrice: 64.8 },
+  { id: 'HSIUSD', label: '항셍선물', short: 'HSI', fallbackPrice: 20850.0 },
+];
+
+const CHANNEL_TABS: Array<{ id: string; label: string; icon: string }> = [
+  { id: 'global', label: '전체', icon: '🌍' },
+  { id: 'NASDAQ', label: '나스닥', icon: '📈' },
+  { id: 'HSI', label: '항셍', icon: '🇭🇰' },
+  { id: 'GOLD', label: '골드', icon: '🥇' },
+  { id: 'OIL', label: '원유', icon: '🛢️' },
+  { id: 'KOSPI', label: '코스피', icon: '🇰🇷' },
 ];
 
 const TIMEFRAMES: Array<{ id: TimeframeId; label: string }> = [
@@ -114,11 +132,11 @@ function formatRelativeTime(value?: string) {
   return `${Math.floor(diffHour / 24)}일 전`;
 }
 
-function getWsUrl(token: string) {
+function getWsUrl(channelId: number, token: string) {
   const url = new URL(BACKEND_HTTP_URL);
   url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  url.pathname = `/ws/chat/${encodeURIComponent(token)}`;
-  url.search = '';
+  url.pathname = `/ws/chat/${channelId}`;
+  url.search = `?token=${encodeURIComponent(token)}`;
   return url.toString();
 }
 
@@ -170,15 +188,16 @@ function ConfidenceGauge({ value }: { value: number }) {
 
 export default function CommunityPanel({ userName = '트레이더' }: { userName?: string }) {
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    createSystemMessage('실시간 유저 채팅방입니다. 인증된 사용자만 접속할 수 있습니다.'),
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeAsset, setActiveAsset] = useState<AssetId>('NQUSD');
   const [activeTimeframe, setActiveTimeframe] = useState<TimeframeId>('1min');
   const [signalLoading, setSignalLoading] = useState(false);
   const [signalResult, setSignalResult] = useState<SignalResult | null>(null);
   const [socketStatus, setSocketStatus] = useState<SocketStatus>('authenticating');
   const [now, setNow] = useState(() => new Date());
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
+  const [activeChannelTab, setActiveChannelTab] = useState('global');
   const socketRef = useRef<WebSocket | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -193,11 +212,54 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
   const newsItems = ((newsData && newsData.length > 0 ? newsData : FALLBACK_NEWS) as NewsItem[]).slice(0, 30);
 
   const connectionText = useMemo(() => {
-    if (socketStatus === 'open') return '인증 연결됨';
+    if (socketStatus === 'open') return '연결됨';
     if (socketStatus === 'authenticating') return '인증 확인 중';
-    if (socketStatus === 'connecting') return '실시간 연결 중';
+    if (socketStatus === 'connecting') return '연결 중';
     return '재로그인 필요';
   }, [socketStatus]);
+
+  // 채널 목록 로드
+  useEffect(() => {
+    const fetchChannels = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        const res = await fetch(`${BACKEND_HTTP_URL}/api/v2/channels`);
+        if (res.ok) {
+          const data = await res.json();
+          const chs: Channel[] = data.channels || [];
+          setChannels(chs);
+          // 기본으로 Global 채널 선택
+          const globalCh = chs.find((c: Channel) => c.name === 'Global');
+          if (globalCh) {
+            setActiveChannelId(globalCh.id);
+          } else if (chs.length > 0) {
+            setActiveChannelId(chs[0].id);
+          }
+        }
+      } catch {
+        // 채널 로드 실패 시 무시
+      }
+    };
+    void fetchChannels();
+  }, []);
+
+  // 채널 탭 → 채널 ID 매핑
+  useEffect(() => {
+    if (channels.length === 0) return;
+    const tabToChannelName: Record<string, string> = {
+      global: 'Global',
+      NASDAQ: 'NASDAQ',
+      HSI: 'HSI',
+      GOLD: 'GOLD',
+      OIL: 'OIL',
+      KOSPI: 'KOSPI',
+    };
+    const targetName = tabToChannelName[activeChannelTab];
+    const ch = channels.find((c) => c.name === targetName);
+    if (ch) {
+      setActiveChannelId(ch.id);
+    }
+  }, [activeChannelTab, channels]);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -208,7 +270,45 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // 채널 변경 시 이전 메시지 로드
   useEffect(() => {
+    if (!activeChannelId) return;
+    const fetchMessages = async () => {
+      try {
+        const token = localStorage.getItem('access_token');
+        if (!token) return;
+        const res = await fetch(`${BACKEND_HTTP_URL}/api/v2/channels/${activeChannelId}/messages`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const loaded: ChatMessage[] = (Array.isArray(data) ? data : []).map((msg: Record<string, unknown>) => ({
+            id: String(msg.id),
+            nickname: (msg.nickname as string) || '트레이더',
+            text: (msg.content as string) || '',
+            time: msg.created_at ? formatKstTime(new Date(msg.created_at as string)) : formatKstTime(new Date()),
+            mine: (msg.nickname as string) === userName,
+          }));
+          setMessages([
+            createSystemMessage(
+              activeChannelTab === 'global'
+                ? '전체 채팅방입니다. 모든 트레이더와 소통하세요.'
+                : `${CHANNEL_TABS.find((t) => t.id === activeChannelTab)?.label || ''} 종목 채팅방입니다.`
+            ),
+            ...loaded,
+          ]);
+        }
+      } catch {
+        // 메시지 로드 실패
+      }
+    };
+    void fetchMessages();
+  }, [activeChannelId, activeChannelTab, userName]);
+
+  // WebSocket 연결 (채널 기반)
+  useEffect(() => {
+    if (!activeChannelId) return;
+
     let cancelled = false;
     let socket: WebSocket | null = null;
 
@@ -216,28 +316,17 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
       const token = localStorage.getItem('access_token');
       if (!token) {
         setSocketStatus('closed');
-        setMessages((prev) => [...prev, createSystemMessage('로그인 인증이 필요합니다. 다시 로그인해주세요.')]);
+        setMessages((prev) => [...prev, createSystemMessage('로그인 인증이 필요합니다.')]);
         clearSessionAndRedirect();
         return;
       }
 
       setSocketStatus('authenticating');
-      const authRes = await fetch('/api/auth/me', {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      });
-
-      if (!authRes.ok) {
-        setSocketStatus('closed');
-        setMessages((prev) => [...prev, createSystemMessage('세션이 만료되었습니다. 다시 로그인해주세요.')]);
-        clearSessionAndRedirect();
-        return;
-      }
 
       if (cancelled) return;
 
       setSocketStatus('connecting');
-      socket = new WebSocket(getWsUrl(token));
+      socket = new WebSocket(getWsUrl(activeChannelId, token));
       socketRef.current = socket;
 
       socket.onopen = () => setSocketStatus('open');
@@ -255,17 +344,44 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.type !== 'public_message') return;
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: `${Date.now()}-${Math.random()}`,
-              nickname: data.nickname || '트레이더',
-              text: data.content || '',
-              time: formatKstTime(data.timestamp ? new Date(data.timestamp) : new Date()),
-              mine: data.nickname === userName,
-            },
-          ]);
+
+          if (data.type === 'presence') {
+            // 접속자 수 표시 (필요시 상태 업데이트)
+            return;
+          }
+
+          if (data.type === 'message') {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `${data.id || Date.now()}-${Math.random()}`,
+                nickname: data.nickname || '트레이더',
+                text: data.content || '',
+                time: data.created_at
+                  ? formatKstTime(new Date(data.created_at))
+                  : data.timestamp
+                    ? formatKstTime(new Date(data.timestamp))
+                    : formatKstTime(new Date()),
+                mine: data.nickname === userName,
+              },
+            ]);
+            return;
+          }
+
+          // AI 개인 응답
+          if (data.type === 'private_user' || data.type === 'private_ai' || data.type === 'private_system') {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `private-${Date.now()}-${Math.random()}`,
+                nickname: data.type === 'private_ai' ? '🤖 AI' : data.type === 'private_system' ? 'SYSTEM' : (data.nickname || userName),
+                text: data.content || '',
+                time: data.timestamp ? formatKstTime(new Date(data.timestamp)) : formatKstTime(new Date()),
+                mine: data.type === 'private_user',
+                isPrivate: true,
+              },
+            ]);
+          }
         } catch {
           // Ignore malformed socket payloads.
         }
@@ -278,7 +394,7 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
       cancelled = true;
       socket?.close();
     };
-  }, [userName]);
+  }, [activeChannelId, userName]);
 
   const handleSend = () => {
     const text = input.trim();
@@ -286,13 +402,13 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     setInput('');
 
     if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: 'public_message', content: text }));
+      socketRef.current.send(JSON.stringify({ content: text }));
       return;
     }
 
     setMessages((prev) => [
       ...prev,
-      createSystemMessage('실시간 채팅 인증 연결을 확인하는 중입니다. 연결 후 다시 전송해주세요.'),
+      createSystemMessage('연결을 확인하는 중입니다. 연결 후 다시 전송해주세요.'),
     ]);
   };
 
@@ -401,40 +517,77 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
       </aside>
 
       <section className="flex min-w-0 flex-1 flex-col bg-[#0D0D0D]">
-        <header className="flex shrink-0 items-center gap-2 border-b border-[#1A1A1A] bg-[#0A0A0F] px-4 py-2.5">
-          <MessageCircle size={13} className="text-[#00FF41]" />
-          <span className="text-[11px] font-bold text-white">실시간 유저 채팅</span>
-          <span className="rounded-lg border border-[#00FF41]/20 bg-[#00FF41]/10 px-2 py-1 text-[9px] font-bold text-[#00FF41]">
-            유저 전용
-          </span>
+        {/* 채널 탭 */}
+        <div className="flex shrink-0 items-center gap-1 border-b border-[#1A1A1A] bg-[#0A0A0F] px-4 py-2">
+          <Hash size={13} className="text-[#00FF41]" />
+          {CHANNEL_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveChannelTab(tab.id)}
+              className="flex items-center gap-1 border px-2 py-1 text-[9px] font-bold transition"
+              style={{
+                borderColor: activeChannelTab === tab.id ? 'rgba(0,255,65,0.35)' : 'transparent',
+                background: activeChannelTab === tab.id ? 'rgba(0,255,65,0.1)' : 'transparent',
+                color: activeChannelTab === tab.id ? '#00FF41' : '#555',
+              }}
+            >
+              <span>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
           <span className="ml-auto rounded-full bg-white/[0.04] px-2 py-1 text-[9px] font-bold text-white/35">
             {connectionText}
           </span>
-        </header>
+        </div>
 
+        {/* 채팅 헤더 */}
+        <div className="flex shrink-0 items-center gap-2 border-b border-[#1A1A1A]/50 bg-[#0A0A0F] px-4 py-2">
+          <MessageCircle size={13} className="text-[#00FF41]" />
+          <span className="text-[11px] font-bold text-white">
+            {CHANNEL_TABS.find((t) => t.id === activeChannelTab)?.icon}{' '}
+            {CHANNEL_TABS.find((t) => t.id === activeChannelTab)?.label} 채팅
+          </span>
+          <span className="rounded-lg border border-[#00FF41]/20 bg-[#00FF41]/10 px-2 py-1 text-[9px] font-bold text-[#00FF41]">
+            실시간
+          </span>
+        </div>
+
+        {/* 메시지 영역 */}
         <div className="flex-1 overflow-y-auto p-5">
           <div className="space-y-3">
             {messages.map((message) => (
               <div key={message.id} className={`flex gap-3 ${message.mine ? 'flex-row-reverse' : ''}`}>
                 <div
                   className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-[10px] font-black ${
-                    message.system ? 'bg-white/5 text-white/35' : message.mine ? 'bg-[#00FF41]/10 text-[#00FF41]' : 'bg-white/10 text-white/70'
+                    message.system
+                      ? 'bg-white/5 text-white/35'
+                      : message.isPrivate
+                        ? 'bg-blue-500/10 text-blue-400'
+                        : message.mine
+                          ? 'bg-[#00FF41]/10 text-[#00FF41]'
+                          : 'bg-white/10 text-white/70'
                   }`}
                 >
-                  {message.system ? <Zap size={14} /> : <User size={14} />}
+                  {message.system ? <Zap size={14} /> : message.isPrivate && !message.mine ? <Bot size={14} /> : <User size={14} />}
                 </div>
                 <div className={`min-w-0 max-w-[76%] ${message.mine ? 'text-right' : ''}`}>
                   <div className="mb-1 flex items-center gap-2">
-                    <span className="text-[11px] font-bold text-white">{message.nickname}</span>
+                    <span className="text-[11px] font-bold text-white">
+                      {message.nickname}
+                      {message.isPrivate && <span className="ml-1 text-[8px] text-blue-400">(개인)</span>}
+                    </span>
                     <span className="text-[9px] text-white/25">{message.time}</span>
                   </div>
                   <div
                     className={`inline-block max-w-full whitespace-pre-wrap break-words border px-3 py-2 text-[12px] leading-6 ${
                       message.system
                         ? 'border-white/[0.06] bg-white/[0.03] text-white/45'
-                        : message.mine
-                          ? 'border-[#00FF41]/20 bg-[#00FF41]/10 text-white'
-                          : 'border-[#1A1A1A] bg-[#111118] text-white/80'
+                        : message.isPrivate
+                          ? 'border-blue-500/20 bg-blue-500/10 text-white'
+                          : message.mine
+                            ? 'border-[#00FF41]/20 bg-[#00FF41]/10 text-white'
+                            : 'border-[#1A1A1A] bg-[#111118] text-white/80'
                     }`}
                   >
                     {message.text}
@@ -446,6 +599,7 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
           </div>
         </div>
 
+        {/* 메시지 입력 */}
         <footer className="shrink-0 border-t border-[#1A1A1A] bg-[#0A0A0F] p-3">
           <div className="flex gap-2">
             <input
@@ -457,7 +611,11 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
                   handleSend();
                 }
               }}
-              placeholder={socketStatus === 'open' ? '유저 채팅 메시지를 입력하세요.' : '인증 연결 후 메시지를 전송할 수 있습니다.'}
+              placeholder={
+                socketStatus === 'open'
+                  ? `메시지를 입력하세요. @ai 질문으로 AI에게 개인 질문 가능`
+                  : '연결 후 메시지를 전송할 수 있습니다.'
+              }
               className="min-w-0 flex-1 border border-[#1A1A1A] bg-[#111118] px-4 py-2.5 text-[12px] text-white outline-none placeholder:text-white/25 focus:border-[#00FF41]/50"
             />
             <button

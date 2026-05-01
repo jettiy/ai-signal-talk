@@ -20,6 +20,8 @@ const SYMBOLS = [
   'NQ=F',    // 나스닥 선물
   'GC=F',    // 골드 선물
   'CL=F',    // WTI 원유 선물
+  'KS=F',    // 코스피 선물
+  'HSI=F',   // 항셍 선물
   'AAPL',    // 애플
   'NVDA',    // 엔비디아
   'TSLA',    // 테슬라
