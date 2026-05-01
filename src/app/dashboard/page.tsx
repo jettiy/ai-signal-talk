@@ -31,6 +31,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<NavId>('community');
   const [user, setUser] = useState<UserInfo | null>(null);
   const [userRole, setUserRole] = useState<UserRole>('BASIC');
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     // localStorage에서 로그인 정보 복원
@@ -48,6 +49,11 @@ export default function DashboardPage() {
     } catch {
       window.location.href = '/';
     }
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
 
   const isValidTab = (tab: NavId): boolean => {
@@ -99,7 +105,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <span className="text-xs text-gray-400">{userName}</span>
               <span className="text-[10px] font-mono" style={{ color: '#555' }}>
-                {new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit' })} KST
+                {now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour: '2-digit', minute: '2-digit', second: '2-digit' })} KST
               </span>
               <button onClick={handleLogout} className="text-xs text-gray-600 hover:text-red-400 transition-colors">
                 로그아웃
