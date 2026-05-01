@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-const BACKEND = 'https://ai-signal-talk-backend.onrender.com';
+import { BACKEND_URL } from '@/lib/backend';
 
 export async function GET(req: NextRequest) {
   const token = req.headers.get('authorization')?.replace('Bearer ', '');
@@ -15,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (search) params.set('search', search);
 
   try {
-    const res = await fetch(`${BACKEND}/api/v2/admin/users?${params}`, {
+    const res = await fetch(`${BACKEND_URL}/api/v2/admin/users?${params}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();

@@ -1,19 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { BACKEND_URL } from '@/lib/backend';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ai-signal-talk-backend.onrender.com';
+const copy = {
+  missingCredentials: '\uC774\uBA54\uC77C\uACFC \uBE44\uBC00\uBC88\uD638\uB97C \uC785\uB825\uD558\uC138\uC694.',
+  invalidCredentials: '\uC774\uBA54\uC77C \uB610\uB294 \uBE44\uBC00\uBC88\uD638\uAC00 \uC62C\uBC14\uB974\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4.',
+  serverFailed: '\uC11C\uBC84 \uC5F0\uACB0\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4.',
+};
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = await req.json();
 
     if (!email || !password) {
-      return NextResponse.json(
-        { error: '이메일과 비밀번호를 입력하세요.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: copy.missingCredentials }, { status: 400 });
     }
 
-    // 백엔드 v2: JSON body (form-urlencoded도 지원)
     const res = await fetch(`${BACKEND_URL}/api/v2/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -24,16 +25,13 @@ export async function POST(req: NextRequest) {
 
     if (!res.ok) {
       return NextResponse.json(
-        { error: data.detail || '이메일 또는 비밀번호가 올바르지 않습니다.' },
+        { error: data.detail || data.error || copy.invalidCredentials },
         { status: res.status }
       );
     }
 
     return NextResponse.json(data);
   } catch {
-    return NextResponse.json(
-      { error: '서버 연결에 실패했습니다.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: copy.serverFailed }, { status: 500 });
   }
 }

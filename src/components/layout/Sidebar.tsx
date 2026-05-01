@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import {
   MessageCircle,
@@ -114,14 +115,14 @@ export default function Sidebar({ active, onNavigate, userRole }: SidebarProps) 
 
       {/* 하단 로그아웃 */}
       <div className="mt-auto">
-        <a
+        <Link
           href="/"
           className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors hover:bg-white/5"
           style={{ color: '#444' }}
           title="로그아웃"
         >
           <LogOut className="w-4 h-4" />
-        </a>
+        </Link>
       </div>
     </aside>
   );

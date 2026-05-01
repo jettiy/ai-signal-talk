@@ -129,7 +129,8 @@ function buildUserPrompt(
     // ATR 기반 진입/손절/목표
     const stopDist = Math.max(atr * 1.5, close * 0.005);
     const takeDist = Math.max(atr * 2.0, close * 0.01);
-    let entry = close, stopLoss = 0, takeProfit = 0;
+    const entry = close;
+    let stopLoss = 0, takeProfit = 0;
     if (direction === 'LONG') {
       stopLoss = +(entry - stopDist).toFixed(2);
       takeProfit = +(entry + takeDist).toFixed(2);
@@ -414,7 +415,8 @@ function generateFallbackSignal(
   const stopDist = Math.max(atr * 1.5, close * 0.005);
   const takeDist = Math.max(atr * 2.0, close * 0.01);
 
-  let entry = close, stopLoss = 0, takeProfit = 0;
+  const entry = close;
+  let stopLoss = 0, takeProfit = 0;
   if (direction === 'LONG') {
     stopLoss = +(entry - stopDist).toFixed(2);
     takeProfit = +(entry + takeDist).toFixed(2);

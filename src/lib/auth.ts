@@ -1,6 +1,4 @@
-// SERVER ONLY — do not import from client components
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ai-signal-talk-backend.onrender.com';
+import { BACKEND_URL } from './backend';
 
 export interface AuthUser {
   id: number;
@@ -19,14 +17,11 @@ export interface RegisterResponse {
   user: AuthUser;
 }
 
-/**
- * 백엔드 로그인 API 호출
- */
 export async function loginBackend(email: string, password: string): Promise<LoginResponse> {
-  const params = new URLSearchParams({ email, password });
-  const res = await fetch(`${BACKEND_URL}/api/auth/login?${params}`, {
+  const res = await fetch(`${BACKEND_URL}/api/v2/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
   });
 
   if (!res.ok) {
@@ -37,18 +32,15 @@ export async function loginBackend(email: string, password: string): Promise<Log
   return res.json();
 }
 
-/**
- * 백엔드 회원가입 API 호출
- */
 export async function registerBackend(
   email: string,
   password: string,
-  full_name: string
+  nickname: string
 ): Promise<RegisterResponse> {
-  const params = new URLSearchParams({ email, password, full_name });
-  const res = await fetch(`${BACKEND_URL}/api/users/register?${params}`, {
+  const res = await fetch(`${BACKEND_URL}/api/v2/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, nickname }),
   });
 
   if (!res.ok) {
