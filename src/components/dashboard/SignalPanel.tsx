@@ -27,18 +27,20 @@ type TimeframeId = (typeof TIMEFRAMES)[number]['id'];
 
 // ── 종목 탭 ─────────────────────────────────────────────────────
 const ASSETS = [
-  { id: 'NQUSD', label: '나스닥(QQQ)', etf: 'QQQ' },
-  { id: 'GCUSD', label: '골드(GLD)', etf: 'GLD' },
-  { id: 'CLUSD', label: 'WTI(USO)', etf: 'USO' },
+  { id: 'NQUSD', label: '나스닥선물', etf: 'QQQ' },
+  { id: 'GCUSD', label: '골드선물', etf: 'GLD' },
+  { id: 'CLUSD', label: 'WTI선물', etf: 'USO' },
   { id: 'KOSPI', label: '코스피선물', etf: '' },
+  { id: 'HSIUSD', label: '항셍선물', etf: '' },
 ] as const;
 
 // ── 종목별 가격 포맷 & 단위 설정 ────────────────────────────────
 const ASSET_CONFIG: Record<string, { decimals: number; stopPct: number; targetPct: number }> = {
-  NQUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.2 },  // QQQ $500 → stop $497.5, target $506
-  GCUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },  // GLD $300 → stop $298.5, target $303
-  CLUSD: { decimals: 2, stopPct: 0.8, targetPct: 2.0 },  // USO $55 → stop $54.5, target $56.1
+  NQUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.2 },
+  GCUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
+  CLUSD: { decimals: 2, stopPct: 0.8, targetPct: 2.0 },
   KOSPI: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
+  HSIUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
 };
 
 // ETF 심볼 매핑 (AI 프롬프트 + UI 표시용)
@@ -47,6 +49,7 @@ const ETF_MAP: Record<string, string> = {
   GCUSD: 'GLD',
   CLUSD: 'USO',
   KOSPI: '',
+  HSIUSD: '',
 };
 
 // 실시간 가격 기반 폴백 시그널 생성

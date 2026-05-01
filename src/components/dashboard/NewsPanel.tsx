@@ -93,9 +93,10 @@ function ImpactBadge({ impact }: { impact: 'high' | 'medium' | 'low' }) {
     medium: 'bg-zinc-700/50 text-zinc-300 border-zinc-500/30',
     low: 'bg-green-900/30 text-green-400 border-green-500/30',
   };
+  const labels = { high: '중요', medium: '보통', low: '낮음' };
   return (
     <span className={`border text-[10px] px-2 py-1 rounded font-bold ${styles[impact]}`}>
-      {impact.toUpperCase()}
+      {labels[impact]}
     </span>
   );
 }
@@ -216,7 +217,7 @@ function EconomicIndicatorsCard() {
                 <div className="mt-0.5 flex items-center gap-2 text-[10px] text-zinc-500">
                   <span>{formatEventTime(item.date)} KST</span>
                   <span className={item.impact === 'high' ? 'text-red-400' : item.impact === 'medium' ? 'text-yellow-400' : 'text-zinc-500'}>
-                    {item.impact.toUpperCase()}
+                    {{ high: '중요', medium: '보통', low: '낮음' }[item.impact] || item.impact}
                   </span>
                 </div>
               </div>

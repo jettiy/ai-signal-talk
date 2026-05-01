@@ -143,11 +143,9 @@ function formatRelativeTime(value?: string) {
 }
 
 function getWsUrl(channelId: number, token: string) {
-  const url = new URL(BACKEND_HTTP_URL);
-  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-  url.pathname = `/ws/chat/${channelId}`;
-  url.search = `?token=${encodeURIComponent(token)}`;
-  return url.toString();
+  const base = BACKEND_HTTP_URL.replace(/\/+$/, '');
+  const wsBase = base.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+  return `${wsBase}/ws/chat/${channelId}?token=${encodeURIComponent(token)}`;
 }
 
 function clearSessionAndRedirect() {
