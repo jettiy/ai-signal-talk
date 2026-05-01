@@ -1,11 +1,12 @@
 // Market Data Client — FMP (Primary) + Mock (Fallback)
 // SERVER ONLY: API Route(route.ts)에서만 임포트
 
-import { Quote, NewsItem, CandleData, FearGreedIndex } from './types';
+import { Quote, NewsItem, CandleData, FearGreedIndex, EconomicCalendarItem } from './types';
 
 // ─── API Keys ───
 const FMP_API_KEY=process.env.FMP_API_KEY || '';
 const FMP_BASE = 'https://financialmodelingprep.com/stable';
+const FMP_SOURCE_URL = 'https://site.financialmodelingprep.com/developer/docs/economic-calendar-api';
 
 // ─── 심볼 매핑: 내부 심볼 ↔ FMP 심볼 ───
 const INTERNAL_TO_FMP: Record<string, string> = {
@@ -152,6 +153,78 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
   }
 }
 
+// Economic calendar from FMP. Used by News Room sidebar for US macro releases.
+export async function getEconomicCalendar(): Promise<EconomicCalendarItem[]> {
+  if (!FMP_API_KEY) return getMockEconomicCalendar();
+
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(now.getDate() - 14);
+  const to = new Date(now);
+  to.setDate(now.getDate() + 14);
+
+  const params = new URLSearchParams({
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    apikey: FMP_API_KEY,
+  });
+
+  try {
+    const res = await fetch(`${FMP_BASE}/economic-calendar?${params.toString()}`, {
+      cache: 'no-store',
+    } as RequestInit);
+
+    if (!res.ok) throw new Error(`FMP Economic Calendar error: ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) return getMockEconomicCalendar();
+
+    return data
+      .filter((item: Record<string, unknown>) => {
+        const country = String(item.country || '').toUpperCase();
+        const event = String(item.event || item.name || '');
+        return (!country || country === 'US' || country === 'UNITED STATES') && event;
+      })
+      .map((item: Record<string, unknown>, index: number) => {
+        const event = String(item.event || item.name || '');
+        return {
+          id: `${String(item.date || '')}-${event}-${index}`,
+          date: String(item.date || item.releaseDate || new Date().toISOString()),
+          country: String(item.country || 'US'),
+          event,
+          actual: formatMacroValue(item.actual),
+          estimate: formatMacroValue(item.estimate ?? item.consensus),
+          previous: formatMacroValue(item.previous),
+          impact: inferEconomicImpact(event),
+          source: 'Financial Modeling Prep',
+          sourceUrl: FMP_SOURCE_URL,
+        } satisfies EconomicCalendarItem;
+      })
+      .sort((a, b) => {
+        const nowMs = Date.now();
+        return Math.abs(new Date(a.date).getTime() - nowMs) - Math.abs(new Date(b.date).getTime() - nowMs);
+      })
+      .slice(0, 6);
+  } catch (error) {
+    console.error('FMP getEconomicCalendar error:', error);
+    return getMockEconomicCalendar();
+  }
+}
+
+function formatMacroValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'number') return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
+  return String(value);
+}
+
+function inferEconomicImpact(event: string): 'high' | 'medium' | 'low' {
+  const normalized = event.toLowerCase();
+  const high = ['cpi', 'pce', 'nonfarm', 'payroll', 'unemployment', 'fomc', 'fed', 'gdp', 'ppi', 'retail sales'];
+  const medium = ['pmi', 'ism', 'jobless', 'durable', 'consumer confidence', 'housing', 'industrial production'];
+  if (high.some((keyword) => normalized.includes(keyword))) return 'high';
+  if (medium.some((keyword) => normalized.includes(keyword))) return 'medium';
+  return 'low';
+}
+
 // ═══════════════════════════════════════════════════════════
 //  Fear & Greed Index (CNN Markets)
 // ═══════════════════════════════════════════════════════════
@@ -197,6 +270,8 @@ export async function getFearGreedIndex(): Promise<FearGreedIndex> {
       value: Math.round(fg.score * 100) / 100,
       valueClassification: capitalizeRating(fg.rating || 'Neutral'),
       timestamp: fg.timestamp || new Date().toISOString(),
+      source: 'CNN Business',
+      sourceUrl: 'https://www.cnn.com/markets/fear-and-greed',
       previousClose: fg.previous_close ?? 0,
       previous1Week: fg.previous_1_week ?? 0,
       previous1Month: fg.previous_1_month ?? 0,
@@ -280,6 +355,8 @@ export function getMockChartData(symbol = 'GCUSD'): CandleData[] {
 export function getMockFearGreedIndex(): FearGreedIndex {
   return {
     value: 45, valueClassification: 'Fear', timestamp: new Date().toISOString(),
+    source: 'CNN Business',
+    sourceUrl: 'https://www.cnn.com/markets/fear-and-greed',
     previousClose: 42, previous1Week: 38, previous1Month: 55, previous1Year: 62,
     subIndicators: [
       { key: 'market_momentum_sp500', label: '시장 모멘텀', score: 35, rating: 'fear' },
@@ -291,4 +368,45 @@ export function getMockFearGreedIndex(): FearGreedIndex {
       { key: 'safe_haven_demand', label: '안전자산 수요', score: 30, rating: 'fear' },
     ],
   };
+}
+
+function getMockEconomicCalendar(): EconomicCalendarItem[] {
+  return [
+    {
+      id: 'mock-cpi',
+      date: new Date().toISOString(),
+      country: 'US',
+      event: 'Consumer Price Index',
+      actual: '-',
+      estimate: '-',
+      previous: '-',
+      impact: 'high',
+      source: 'Financial Modeling Prep',
+      sourceUrl: FMP_SOURCE_URL,
+    },
+    {
+      id: 'mock-nfp',
+      date: new Date().toISOString(),
+      country: 'US',
+      event: 'Nonfarm Payrolls',
+      actual: '-',
+      estimate: '-',
+      previous: '-',
+      impact: 'high',
+      source: 'Financial Modeling Prep',
+      sourceUrl: FMP_SOURCE_URL,
+    },
+    {
+      id: 'mock-jobless',
+      date: new Date().toISOString(),
+      country: 'US',
+      event: 'Initial Jobless Claims',
+      actual: '-',
+      estimate: '-',
+      previous: '-',
+      impact: 'medium',
+      source: 'Financial Modeling Prep',
+      sourceUrl: FMP_SOURCE_URL,
+    },
+  ];
 }

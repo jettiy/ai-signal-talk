@@ -45,6 +45,8 @@ export interface FearGreedIndex {
   value: number;          // 0~100
   valueClassification: string;  // 'Extreme Fear' | 'Fear' | 'Neutral' | 'Greed' | 'Extreme Greed'
   timestamp: string;
+  source?: string;
+  sourceUrl?: string;
   previousClose: number;
   previous1Week: number;
   previous1Month: number;
@@ -57,6 +59,19 @@ export interface FearGreedSubIndicator {
   label: string;        // 한국어 라벨
   score: number;
   rating: string;
+}
+
+export interface EconomicCalendarItem {
+  id: string;
+  date: string;
+  country: string;
+  event: string;
+  actual: string;
+  estimate: string;
+  previous: string;
+  impact: 'high' | 'medium' | 'low';
+  source: string;
+  sourceUrl: string;
 }
 
 // ===== AI 시그널 결과 (확장 스키마) =====
