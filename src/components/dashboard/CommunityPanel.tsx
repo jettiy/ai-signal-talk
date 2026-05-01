@@ -62,6 +62,16 @@ interface Channel {
 const BACKEND_HTTP_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL || 'https://ai-signal-talk-backend.onrender.com';
 
+// 채널 API 실패 시 사용할 기본 채널 ID (백엔드 startup에서 생성하는 순서)
+const DEFAULT_CHANNELS: Channel[] = [
+  { id: 1, name: 'Global', symbol: null },
+  { id: 2, name: 'NASDAQ', symbol: 'NQUSD' },
+  { id: 3, name: 'HSI', symbol: 'HSIUSD' },
+  { id: 4, name: 'GOLD', symbol: 'GCUSD' },
+  { id: 5, name: 'OIL', symbol: 'CLUSD' },
+  { id: 6, name: 'KOSPI', symbol: 'KSUSD' },
+];
+
 const ASSETS: Array<{ id: AssetId; label: string; short: string; fallbackPrice: number }> = [
   { id: 'KOSPI', label: '코스피선물', short: 'KOSPI', fallbackPrice: 2650.3 },
   { id: 'NQUSD', label: '나스닥선물', short: 'NQ', fallbackPrice: 21285.5 },
@@ -218,34 +228,34 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     return '재로그인 필요';
   }, [socketStatus]);
 
-  // 채널 목록 로드
+  // 채널 목록 로드 (fallback: 기본 채널 ID 사용)
   useEffect(() => {
     const fetchChannels = async () => {
       try {
-        const token = localStorage.getItem('access_token');
         const res = await fetch(`${BACKEND_HTTP_URL}/api/v2/channels`);
         if (res.ok) {
           const data = await res.json();
           const chs: Channel[] = data.channels || [];
-          setChannels(chs);
-          // 기본으로 Global 채널 선택
-          const globalCh = chs.find((c: Channel) => c.name === 'Global');
-          if (globalCh) {
-            setActiveChannelId(globalCh.id);
-          } else if (chs.length > 0) {
-            setActiveChannelId(chs[0].id);
+          if (chs.length > 0) {
+            setChannels(chs);
+            const globalCh = chs.find((c: Channel) => c.name === 'Global');
+            setActiveChannelId(globalCh ? globalCh.id : chs[0].id);
+            return;
           }
         }
       } catch {
-        // 채널 로드 실패 시 무시
+        // API 실패 — fallback 사용
       }
+      // fallback: 기본 채널 설정
+      console.log('[CHAT] Using fallback channels');
+      setChannels(DEFAULT_CHANNELS);
+      setActiveChannelId(1); // Global = id 1
     };
     void fetchChannels();
   }, []);
 
   // 채널 탭 → 채널 ID 매핑
   useEffect(() => {
-    if (channels.length === 0) return;
     const tabToChannelName: Record<string, string> = {
       global: 'Global',
       NASDAQ: 'NASDAQ',
@@ -258,6 +268,10 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     const ch = channels.find((c) => c.name === targetName);
     if (ch) {
       setActiveChannelId(ch.id);
+    } else {
+      // fallback: 탭 이름으로 기본 채널 ID 추측
+      const fallback = DEFAULT_CHANNELS.find((c) => c.name === targetName);
+      if (fallback) setActiveChannelId(fallback.id);
     }
   }, [activeChannelTab, channels]);
 
@@ -305,12 +319,15 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     void fetchMessages();
   }, [activeChannelId, activeChannelTab, userName]);
 
-  // WebSocket 연결 (채널 기반)
+  // WebSocket 연결 (채널 기반 + 자동 재연결)
   useEffect(() => {
     if (!activeChannelId) return;
 
     let cancelled = false;
     let socket: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT = 5;
 
     const connect = async () => {
       const token = localStorage.getItem('access_token');
@@ -321,32 +338,51 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
         return;
       }
 
-      setSocketStatus('authenticating');
-
       if (cancelled) return;
 
       setSocketStatus('connecting');
-      socket = new WebSocket(getWsUrl(activeChannelId, token));
+      try {
+        socket = new WebSocket(getWsUrl(activeChannelId, token));
+      } catch (err) {
+        console.error('[WS] WebSocket 생성 실패:', err);
+        setSocketStatus('closed');
+        return;
+      }
       socketRef.current = socket;
 
-      socket.onopen = () => setSocketStatus('open');
+      socket.onopen = () => {
+        reconnectAttempts = 0;
+        setSocketStatus('open');
+      };
+
       socket.onclose = (event) => {
         setSocketStatus('closed');
         if (event.code === 4001) {
           setMessages((prev) => [...prev, createSystemMessage('채팅 인증이 만료되었습니다. 다시 로그인해주세요.')]);
           clearSessionAndRedirect();
+          return;
+        }
+        // 자동 재연결
+        if (!cancelled && reconnectAttempts < MAX_RECONNECT) {
+          reconnectAttempts++;
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+          console.log(`[WS] Reconnecting in ${delay}ms (attempt ${reconnectAttempts}/${MAX_RECONNECT})`);
+          reconnectTimer = setTimeout(() => {
+            if (!cancelled) void connect();
+          }, delay);
         }
       };
+
       socket.onerror = () => {
         setSocketStatus('closed');
         socket?.close();
       };
+
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
 
           if (data.type === 'presence') {
-            // 접속자 수 표시 (필요시 상태 업데이트)
             return;
           }
 
@@ -392,6 +428,7 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
 
     return () => {
       cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
       socket?.close();
     };
   }, [activeChannelId, userName]);
