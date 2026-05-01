@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import SignalChartLogo from '@/components/icons/SignalChartLogo';
 import Sidebar, { type NavId } from '@/components/layout/Sidebar';
 import TickerBar from '@/components/dashboard/TickerBar';
@@ -14,17 +14,25 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import type { UserRole } from '@/lib/types';
 
 interface UserInfo {
-  id?: string;
+  id?: string | number;
   email?: string;
   nickname?: string;
   level?: string;
+  role?: string;
   is_pro?: boolean;
 }
 
-function getRoleFromLevel(level?: string, isPro?: boolean): UserRole {
-  if (level === 'LEVEL_99') return 'ADMIN';
-  if (isPro || level === 'LEVEL_50') return 'PRO';
+function getRole(user?: UserInfo | null): UserRole {
+  if (!user) return 'BASIC';
+  if (user.role === 'ADMIN' || user.level === 'LEVEL_99') return 'ADMIN';
+  if (user.role === 'PRO' || user.is_pro || user.level === 'LEVEL_50') return 'PRO';
   return 'BASIC';
+}
+
+function clearSessionAndRedirect() {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('user');
+  window.location.href = '/';
 }
 
 export default function DashboardPage() {
@@ -34,21 +42,40 @@ export default function DashboardPage() {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    // localStorage에서 로그인 정보 복원
-    try {
-      const raw = localStorage.getItem('user');
-      const token = localStorage.getItem('access_token');
-      if (raw && token) {
-        const u = JSON.parse(raw) as UserInfo;
-        setUser(u);
-        setUserRole(getRoleFromLevel(u.level, u.is_pro));
-      } else {
-        // 로그인 안 되어 있으면 랜딩으로
-        window.location.href = '/';
+    const restoreSession = async () => {
+      try {
+        const raw = localStorage.getItem('user');
+        const token = localStorage.getItem('access_token');
+
+        if (!raw || !token) {
+          clearSessionAndRedirect();
+          return;
+        }
+
+        const cachedUser = JSON.parse(raw) as UserInfo;
+        setUser(cachedUser);
+        setUserRole(getRole(cachedUser));
+
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` },
+          cache: 'no-store',
+        });
+
+        if (!res.ok) {
+          clearSessionAndRedirect();
+          return;
+        }
+
+        const verifiedUser = (await res.json()) as UserInfo;
+        localStorage.setItem('user', JSON.stringify(verifiedUser));
+        setUser(verifiedUser);
+        setUserRole(getRole(verifiedUser));
+      } catch {
+        clearSessionAndRedirect();
       }
-    } catch {
-      window.location.href = '/';
-    }
+    };
+
+    void restoreSession();
   }, []);
 
   useEffect(() => {
@@ -66,9 +93,7 @@ export default function DashboardPage() {
   const userName = user?.nickname || user?.email?.split('@')[0] || '트레이더';
 
   const handleLogout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
-    window.location.href = '/';
+    clearSessionAndRedirect();
   };
 
   if (!user) {
@@ -76,7 +101,7 @@ export default function DashboardPage() {
       <div className="flex h-screen items-center justify-center" style={{ background: '#0D0D0D' }}>
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-green-400 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">로딩 중...</p>
+          <p className="text-gray-500 text-sm">인증 확인 중...</p>
         </div>
       </div>
     );

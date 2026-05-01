@@ -20,6 +20,7 @@ import { useNews } from '@/hooks/useNews';
 
 type AssetId = 'KOSPI' | 'NQUSD' | 'GCUSD' | 'CLUSD';
 type TimeframeId = '1min' | '5min' | '15min' | '30min' | '1hour' | '1day';
+type SocketStatus = 'authenticating' | 'connecting' | 'open' | 'closed';
 
 interface ChatMessage {
   id: string;
@@ -75,16 +76,6 @@ const FALLBACK_NEWS: NewsItem[] = [
   { id: 3, title: 'WTI, 재고 지표와 산유국 발언에 단기 방향성 탐색', source: 'MarketWatch', time: new Date().toISOString(), impact: 'medium', symbol: 'CLUSD' },
 ];
 
-const INITIAL_MESSAGES: ChatMessage[] = [
-  {
-    id: 'welcome',
-    nickname: 'SYSTEM',
-    text: '실시간 유저 채팅방입니다. 이 영역에는 유저 메시지만 표시됩니다.',
-    time: formatKstTime(new Date()),
-    system: true,
-  },
-];
-
 const IMPACT_MAP = {
   high: { label: '중요', color: '#FF3B3B', bg: 'rgba(255,59,59,0.12)' },
   medium: { label: '보통', color: '#FFD700', bg: 'rgba(255,215,0,0.12)' },
@@ -131,6 +122,22 @@ function getWsUrl(token: string) {
   return url.toString();
 }
 
+function clearSessionAndRedirect() {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('user');
+  window.location.href = '/';
+}
+
+function createSystemMessage(text: string): ChatMessage {
+  return {
+    id: `system-${Date.now()}-${Math.random()}`,
+    nickname: 'SYSTEM',
+    text,
+    time: formatKstTime(new Date()),
+    system: true,
+  };
+}
+
 function ConfidenceGauge({ value }: { value: number }) {
   const radius = 34;
   const circumference = 2 * Math.PI * radius;
@@ -163,12 +170,14 @@ function ConfidenceGauge({ value }: { value: number }) {
 
 export default function CommunityPanel({ userName = '트레이더' }: { userName?: string }) {
   const [input, setInput] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    createSystemMessage('실시간 유저 채팅방입니다. 인증된 사용자만 접속할 수 있습니다.'),
+  ]);
   const [activeAsset, setActiveAsset] = useState<AssetId>('NQUSD');
   const [activeTimeframe, setActiveTimeframe] = useState<TimeframeId>('1min');
   const [signalLoading, setSignalLoading] = useState(false);
   const [signalResult, setSignalResult] = useState<SignalResult | null>(null);
-  const [socketStatus, setSocketStatus] = useState<'connecting' | 'open' | 'closed'>('connecting');
+  const [socketStatus, setSocketStatus] = useState<SocketStatus>('authenticating');
   const [now, setNow] = useState(() => new Date());
   const socketRef = useRef<WebSocket | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -184,9 +193,10 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
   const newsItems = ((newsData && newsData.length > 0 ? newsData : FALLBACK_NEWS) as NewsItem[]).slice(0, 30);
 
   const connectionText = useMemo(() => {
-    if (socketStatus === 'open') return '실시간 연결';
-    if (socketStatus === 'connecting') return '연결 중';
-    return '로컬 모드';
+    if (socketStatus === 'open') return '인증 연결됨';
+    if (socketStatus === 'authenticating') return '인증 확인 중';
+    if (socketStatus === 'connecting') return '실시간 연결 중';
+    return '재로그인 필요';
   }, [socketStatus]);
 
   useEffect(() => {
@@ -199,41 +209,75 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
   }, [messages]);
 
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-    if (!token) {
-      setSocketStatus('closed');
-      return;
-    }
+    let cancelled = false;
+    let socket: WebSocket | null = null;
 
-    const socket = new WebSocket(getWsUrl(token));
-    socketRef.current = socket;
-
-    socket.onopen = () => setSocketStatus('open');
-    socket.onclose = () => setSocketStatus('closed');
-    socket.onerror = () => {
-      setSocketStatus('closed');
-      socket.close();
-    };
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type !== 'public_message') return;
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `${Date.now()}-${Math.random()}`,
-            nickname: data.nickname || '트레이더',
-            text: data.content || '',
-            time: formatKstTime(data.timestamp ? new Date(data.timestamp) : new Date()),
-            mine: data.nickname === userName,
-          },
-        ]);
-      } catch {
-        // Ignore malformed socket payloads.
+    const connect = async () => {
+      const token = localStorage.getItem('access_token');
+      if (!token) {
+        setSocketStatus('closed');
+        setMessages((prev) => [...prev, createSystemMessage('로그인 인증이 필요합니다. 다시 로그인해주세요.')]);
+        clearSessionAndRedirect();
+        return;
       }
+
+      setSocketStatus('authenticating');
+      const authRes = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+
+      if (!authRes.ok) {
+        setSocketStatus('closed');
+        setMessages((prev) => [...prev, createSystemMessage('세션이 만료되었습니다. 다시 로그인해주세요.')]);
+        clearSessionAndRedirect();
+        return;
+      }
+
+      if (cancelled) return;
+
+      setSocketStatus('connecting');
+      socket = new WebSocket(getWsUrl(token));
+      socketRef.current = socket;
+
+      socket.onopen = () => setSocketStatus('open');
+      socket.onclose = (event) => {
+        setSocketStatus('closed');
+        if (event.code === 4001) {
+          setMessages((prev) => [...prev, createSystemMessage('채팅 인증이 만료되었습니다. 다시 로그인해주세요.')]);
+          clearSessionAndRedirect();
+        }
+      };
+      socket.onerror = () => {
+        setSocketStatus('closed');
+        socket?.close();
+      };
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type !== 'public_message') return;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `${Date.now()}-${Math.random()}`,
+              nickname: data.nickname || '트레이더',
+              text: data.content || '',
+              time: formatKstTime(data.timestamp ? new Date(data.timestamp) : new Date()),
+              mine: data.nickname === userName,
+            },
+          ]);
+        } catch {
+          // Ignore malformed socket payloads.
+        }
+      };
     };
 
-    return () => socket.close();
+    void connect();
+
+    return () => {
+      cancelled = true;
+      socket?.close();
+    };
   }, [userName]);
 
   const handleSend = () => {
@@ -248,13 +292,7 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
 
     setMessages((prev) => [
       ...prev,
-      {
-        id: `${Date.now()}-${Math.random()}`,
-        nickname: userName,
-        text,
-        time: formatKstTime(new Date()),
-        mine: true,
-      },
+      createSystemMessage('실시간 채팅 인증 연결을 확인하는 중입니다. 연결 후 다시 전송해주세요.'),
     ]);
   };
 
@@ -419,13 +457,13 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
                   handleSend();
                 }
               }}
-              placeholder="유저 채팅 메시지를 입력하세요."
+              placeholder={socketStatus === 'open' ? '유저 채팅 메시지를 입력하세요.' : '인증 연결 후 메시지를 전송할 수 있습니다.'}
               className="min-w-0 flex-1 border border-[#1A1A1A] bg-[#111118] px-4 py-2.5 text-[12px] text-white outline-none placeholder:text-white/25 focus:border-[#00FF41]/50"
             />
             <button
               type="button"
               onClick={handleSend}
-              disabled={!input.trim()}
+              disabled={!input.trim() || socketStatus !== 'open'}
               className="flex items-center gap-1.5 bg-[#00FF41] px-4 py-2.5 text-[12px] font-bold text-black transition hover:bg-[#35ff6a] disabled:cursor-not-allowed disabled:bg-[#333] disabled:text-white/30"
             >
               <Send size={12} />
