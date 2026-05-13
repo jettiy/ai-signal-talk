@@ -2,8 +2,22 @@ import { NextResponse } from 'next/server';
 import { getQuotes } from '@/lib/fmp';
 
 export async function GET() {
-  // 현재 FMP 구독에서 사용 가능한 심볼
-  const symbols = ['NQUSD', 'GCUSD', 'CLUSD', 'AAPL', 'NVDA', 'TSLA', 'META', 'MSFT', 'AMZN', 'SPY', 'QQQ'];
+  // 선물 5종 + 주요 종목 (커뮤니티 패널 `activeAsset`과 심볼 키 일치)
+  const symbols = [
+    'NQUSD',
+    'GCUSD',
+    'CLUSD',
+    'KOSPI',
+    'HSIUSD',
+    'AAPL',
+    'NVDA',
+    'TSLA',
+    'META',
+    'MSFT',
+    'AMZN',
+    'SPY',
+    'QQQ',
+  ];
   const data = await getQuotes(symbols);
 
   // ISR 캐싱: 30초마다 revalidate (실시간 시세는 빠르게 갱신 필요)

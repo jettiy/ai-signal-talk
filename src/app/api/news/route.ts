@@ -88,6 +88,9 @@ export async function GET(req: NextRequest) {
   const symbol = searchParams.get('symbol') || '';
   const category = searchParams.get('category') || ''; // 인터페이스 유지
   const mode = searchParams.get('mode') || 'column';
+  /** `translate=0` 또는 `NEWS_SKIP_TRANSLATE=1`이면 Z.AI 번역 생략(첫 로딩 단축) */
+  const skipTranslate =
+    process.env.NEWS_SKIP_TRANSLATE === '1' || searchParams.get('translate') === '0';
   void category;
 
   // ── 1. RSS + GDELT 병렬 수집 ────────────────────────
@@ -128,8 +131,10 @@ export async function GET(req: NextRequest) {
     filteredNews = scored.length > 0 ? scored.slice(0, 20) : uniqueNews.slice(0, 15);
   }
 
-  // ── 4. 한국어 번역 ──────────────────────────────────
-  const translatedNews = await translateNewsToKorean(filteredNews);
+  // ── 4. 한국어 번역 (옵션으로 생략 가능) ─────────────
+  const translatedNews = skipTranslate
+    ? filteredNews
+    : await translateNewsToKorean(filteredNews);
 
   // ── 5. URL 최종 검증 — 유효한 URL만 남김 ────────────
   const enriched = translatedNews

@@ -73,11 +73,11 @@ const DEFAULT_CHANNELS: Channel[] = [
 ];
 
 const ASSETS: Array<{ id: AssetId; label: string; short: string; fallbackPrice: number }> = [
-  { id: 'KOSPI', label: '코스피선물', short: 'KOSPI', fallbackPrice: 2650.3 },
-  { id: 'NQUSD', label: '나스닥선물', short: 'NQ', fallbackPrice: 21285.5 },
-  { id: 'GCUSD', label: '골드선물', short: 'GOLD', fallbackPrice: 4821.3 },
-  { id: 'CLUSD', label: 'WTI선물', short: 'WTI', fallbackPrice: 64.8 },
-  { id: 'HSIUSD', label: '항셍선물', short: 'HSI', fallbackPrice: 20850.0 },
+  { id: 'KOSPI', label: '코스피선물', short: 'KOSPI', fallbackPrice: 1186.0 },
+  { id: 'NQUSD', label: '나스닥선물', short: 'NQ', fallbackPrice: 21250.0 },
+  { id: 'GCUSD', label: '골드선물', short: 'GOLD', fallbackPrice: 3325.0 },
+  { id: 'CLUSD', label: 'WTI선물', short: 'WTI', fallbackPrice: 62.4 },
+  { id: 'HSIUSD', label: '항셍선물', short: 'HSI', fallbackPrice: 21380.0 },
 ];
 
 const CHANNEL_TABS: Array<{ id: string; label: string; icon: string }> = [

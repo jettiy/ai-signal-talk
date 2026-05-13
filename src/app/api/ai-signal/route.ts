@@ -19,6 +19,8 @@ function checkDailyLimit(ip: string): { allowed: boolean; remaining: number } {
 }
 
 export async function POST(req: NextRequest) {
+  const requestOrigin = new URL(req.url).origin;
+
   // IP 체크
   const ip = req.headers.get('x-forwarded-for') || 'anonymous';
   const { allowed, remaining } = checkDailyLimit(ip);
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest) {
     try {
       const tf = timeframe || '15min';
       const indicatorRes = await fetch(
-        `${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/indicators?symbol=${symbol}&timeframe=${tf}`
+        `${requestOrigin}/api/indicators?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(tf)}`
       );
       if (indicatorRes.ok) indicators = await indicatorRes.json();
     } catch {}

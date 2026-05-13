@@ -8,61 +8,101 @@ const FMP_API_KEY=process.env.FMP_API_KEY || '';
 const FMP_BASE = 'https://financialmodelingprep.com/stable';
 const FMP_SOURCE_URL = 'https://site.financialmodelingprep.com/developer/docs/economic-calendar-api';
 
-// ─── 심볼 매핑: 내부 심볼 ↔ FMP 심볼 ───
+// ─── 심볼 매핑: 내부 심볼 ↔ FMP (선물·지수는 `=F` 연속계약, ws-relay와 동일) ───
 const INTERNAL_TO_FMP: Record<string, string> = {
-  NQUSD: 'QQQ', GCUSD: 'GLD', CLUSD: 'USO', KOSPI: '^KS11',
-  AAPL: 'AAPL', NVDA: 'NVDA', TSLA: 'TSLA',
-  META: 'META', MSFT: 'MSFT', AMZN: 'AMZN', SPY: 'SPY', QQQ: 'QQQ',
+  NQUSD: 'NQ=F',
+  GCUSD: 'GC=F',
+  CLUSD: 'CL=F',
+  KOSPI: 'KS=F',
+  HSIUSD: 'HSI=F',
+  AAPL: 'AAPL',
+  NVDA: 'NVDA',
+  TSLA: 'TSLA',
+  META: 'META',
+  MSFT: 'MSFT',
+  AMZN: 'AMZN',
+  SPY: 'SPY',
+  QQQ: 'QQQ',
 };
 
 // ═══════════════════════════════════════════════════════════
 //  실시간 시세 (Quote)
 // ═══════════════════════════════════════════════════════════
 export async function getQuotes(symbols: string[]): Promise<Quote[]> {
-  if (FMP_API_KEY) {
-    try {
-      const results = await fmpGetQuotes(symbols);
-      if (results.length > 0) return results;
-    } catch (e) {
-      console.warn('[FMP] getQuotes 실패, mock 폴백:', e);
-    }
+  const mocks = getMockQuotes(symbols);
+  const mockMap = new Map(mocks.map((q) => [q.symbol, q]));
+
+  if (!FMP_API_KEY) return mocks;
+
+  try {
+    const live = await fmpGetQuotes(symbols);
+    if (live.length === 0) return mocks;
+    return symbols.map((sym) => live.find((q) => q.symbol === sym) || mockMap.get(sym)!).filter(Boolean) as Quote[];
+  } catch (e) {
+    console.warn('[FMP] getQuotes 실패, mock 폴백:', e);
+    return mocks;
   }
-  return getMockQuotes(symbols);
 }
 
-// FMP: 개별 심볼 병렬 호출
+function quoteFromFmpRow(raw: Record<string, unknown>, internalSymbol: string): Quote {
+  const pct = Number(raw.changesPercentage ?? raw.changePercentage ?? 0);
+  return {
+    symbol: internalSymbol,
+    price: Number(raw.price) || 0,
+    changesPercentage: Number.isFinite(pct) ? pct : 0,
+    change: Number(raw.change) || 0,
+    dayLow: Number(raw.dayLow) || 0,
+    dayHigh: Number(raw.dayHigh) || 0,
+    yearHigh: Number(raw.yearHigh) || 0,
+    yearLow: Number(raw.yearLow) || 0,
+    marketCap: Number(raw.marketCap) || 0,
+    priceAvg50: Number(raw.priceAvg50) || 0,
+    priceAvg200: Number(raw.priceAvg200) || 0,
+    volume: Number(raw.volume) || 0,
+    avgVolume: Number(raw.avgVolume) || 0,
+    exchange: String(raw.exchange || ''),
+    open: Number(raw.open) || 0,
+    previousClose: Number(raw.previousClose) || 0,
+    eps: Number(raw.eps) || 0,
+    pe: Number(raw.pe) || 0,
+  };
+}
+
+/** FMP batch quote — 한 번의 HTTP로 병렬 개별 호출 대비 지연·레이트리밋 부담 감소 */
 async function fmpGetQuotes(symbols: string[]): Promise<Quote[]> {
-  const results = await Promise.all(
-    symbols.map(async (symbol) => {
-      const fmpSym = INTERNAL_TO_FMP[symbol] || symbol;
-      const res = await fetch(`${FMP_BASE}/quote?symbol=${fmpSym}&apikey=${FMP_API_KEY}`, { cache: 'no-store' } as RequestInit);
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (!data || data.length === 0) return null;
-      const raw = data[0];
-      return {
-        symbol,
-        price: raw.price ?? 0,
-        changesPercentage: raw.changePercentage ?? 0,
-        change: raw.change ?? 0,
-        dayLow: raw.dayLow ?? 0,
-        dayHigh: raw.dayHigh ?? 0,
-        yearHigh: raw.yearHigh ?? 0,
-        yearLow: raw.yearLow ?? 0,
-        marketCap: raw.marketCap ?? 0,
-        priceAvg50: raw.priceAvg50 ?? 0,
-        priceAvg200: raw.priceAvg200 ?? 0,
-        volume: raw.volume ?? 0,
-        avgVolume: raw.avgVolume ?? 0,
-        exchange: raw.exchange ?? '',
-        open: raw.open ?? 0,
-        previousClose: raw.previousClose ?? 0,
-        eps: raw.eps ?? 0,
-        pe: raw.pe ?? 0,
-      } as Quote;
+  if (symbols.length === 0) return [];
+
+  const pairs = symbols.map((symbol) => ({
+    internal: symbol,
+    fmp: INTERNAL_TO_FMP[symbol] || symbol,
+  }));
+
+  const uniqFmp = [...new Set(pairs.map((p) => p.fmp))];
+  const url = `${FMP_BASE}/quote?symbols=${encodeURIComponent(uniqFmp.join(','))}&apikey=${FMP_API_KEY}`;
+
+  const res = await fetch(url, { cache: 'no-store' } as RequestInit);
+  if (!res.ok) return [];
+
+  const data: unknown = await res.json();
+  const rows: Record<string, unknown>[] = Array.isArray(data)
+    ? (data as Record<string, unknown>[])
+    : data && typeof data === 'object'
+      ? [data as Record<string, unknown>]
+      : [];
+
+  const byFmp = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const sym = String(row.symbol || '').trim();
+    if (sym) byFmp.set(sym, row);
+  }
+
+  return pairs
+    .map(({ internal, fmp }) => {
+      const raw = byFmp.get(fmp);
+      if (!raw || raw.price == null) return null;
+      return quoteFromFmpRow(raw, internal);
     })
-  );
-  return results.filter((r): r is Quote => r !== null);
+    .filter((r): r is Quote => r !== null);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -293,10 +333,11 @@ function capitalizeRating(r: string): string {
 // ═══════════════════════════════════════════════════════════
 export function getMockQuotes(symbols: string[]): Quote[] {
   const base: Record<string, Omit<Quote, 'symbol'>> = {
-    'GCUSD': { price: 4814.7, changesPercentage: 0.13, change: 6.4, dayLow: 4785.9, dayHigh: 4827.2, yearHigh: 5626.8, yearLow: 3123.3, marketCap: 0, priceAvg50: 4891.3, priceAvg200: 4377.5, volume: 28029, avgVolume: 25000, exchange: 'COMMODITY', open: 4811.8, previousClose: 4808.3, eps: 0, pe: 0 },
-    'NQUSD': { price: 21285.5, changesPercentage: 0.42, change: 89.2, dayLow: 21150, dayHigh: 21320, yearHigh: 22500, yearLow: 18500, marketCap: 0, priceAvg50: 20800, priceAvg200: 19500, volume: 150000, avgVolume: 120000, exchange: 'COMMODITY', open: 21200, previousClose: 21196.3, eps: 0, pe: 0 },
-    'CLUSD': { price: 64.8, changesPercentage: -0.35, change: -0.23, dayLow: 64.2, dayHigh: 65.1, yearHigh: 82.5, yearLow: 55.0, marketCap: 0, priceAvg50: 67.5, priceAvg200: 71.2, volume: 250000, avgVolume: 220000, exchange: 'COMMODITY', open: 65.03, previousClose: 65.03, eps: 0, pe: 0 },
-    'KOSPI': { price: 2650.3, changesPercentage: 0.38, change: 10.1, dayLow: 2635.0, dayHigh: 2665.0, yearHigh: 2800.0, yearLow: 2400.0, marketCap: 0, priceAvg50: 2620.0, priceAvg200: 2550.0, volume: 800000, avgVolume: 750000, exchange: 'KRX', open: 2640.2, previousClose: 2640.2, eps: 0, pe: 0 },
+    'GCUSD': { price: 3325.4, changesPercentage: 0.13, change: 4.2, dayLow: 3298.0, dayHigh: 3340.0, yearHigh: 3500.0, yearLow: 2800.0, marketCap: 0, priceAvg50: 3280.0, priceAvg200: 3100.0, volume: 280000, avgVolume: 250000, exchange: 'COMMODITY', open: 3321.0, previousClose: 3321.2, eps: 0, pe: 0 },
+    'NQUSD': { price: 21250.0, changesPercentage: 0.35, change: 74.0, dayLow: 21120.0, dayHigh: 21310.0, yearHigh: 22500.0, yearLow: 18500.0, marketCap: 0, priceAvg50: 20800.0, priceAvg200: 19800.0, volume: 150000, avgVolume: 120000, exchange: 'COMMODITY', open: 21176.0, previousClose: 21176.0, eps: 0, pe: 0 },
+    'CLUSD': { price: 62.4, changesPercentage: -0.28, change: -0.18, dayLow: 61.9, dayHigh: 63.1, yearHigh: 82.5, yearLow: 55.0, marketCap: 0, priceAvg50: 65.0, priceAvg200: 71.0, volume: 250000, avgVolume: 220000, exchange: 'COMMODITY', open: 62.58, previousClose: 62.58, eps: 0, pe: 0 },
+    'KOSPI': { price: 1186.0, changesPercentage: 0.22, change: 2.6, dayLow: 1178.0, dayHigh: 1192.0, yearHigh: 1250.0, yearLow: 1080.0, marketCap: 0, priceAvg50: 1165.0, priceAvg200: 1140.0, volume: 120000, avgVolume: 110000, exchange: 'KRX', open: 1183.4, previousClose: 1183.4, eps: 0, pe: 0 },
+    'HSIUSD': { price: 21380.0, changesPercentage: -0.15, change: -32.0, dayLow: 21250.0, dayHigh: 21500.0, yearHigh: 24500.0, yearLow: 18500.0, marketCap: 0, priceAvg50: 21800.0, priceAvg200: 20500.0, volume: 90000, avgVolume: 85000, exchange: 'HKEX', open: 21412.0, previousClose: 21412.0, eps: 0, pe: 0 },
     'AAPL': { price: 263.4, changesPercentage: 1.23, change: 3.2, dayLow: 260.0, dayHigh: 264.5, yearHigh: 270.0, yearLow: 200.0, marketCap: 4000000000000, priceAvg50: 255.0, priceAvg200: 240.0, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 260.5, previousClose: 260.2, eps: 6.58, pe: 40.0 },
     'NVDA': { price: 198.35, changesPercentage: 3.45, change: 6.6, dayLow: 192.0, dayHigh: 200.5, yearHigh: 210.0, yearLow: 100.0, marketCap: 4800000000000, priceAvg50: 185.0, priceAvg200: 160.0, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 191.8, previousClose: 191.7, eps: 3.20, pe: 61.8 },
     'TSLA': { price: 388.9, changesPercentage: -2.34, change: -9.3, dayLow: 382.0, dayHigh: 400.0, yearHigh: 420.0, yearLow: 250.0, marketCap: 1200000000000, priceAvg50: 370.0, priceAvg200: 340.0, volume: 95234000, avgVolume: 90000000, exchange: 'NASDAQ', open: 398.2, previousClose: 398.2, eps: 4.20, pe: 92.6 },
@@ -331,10 +372,11 @@ export function getMockNews(): NewsItem[] {
 export function getMockChartData(symbol = 'GCUSD'): CandleData[] {
   const now = Date.now();
   const config: Record<string, { basePrice: number; volatility: number }> = {
-    'NQUSD': { basePrice: 21285, volatility: 15 },
-    'GCUSD': { basePrice: 4810, volatility: 4 },
-    'CLUSD': { basePrice: 64.8, volatility: 0.3 },
-    'KOSPI': { basePrice: 2650, volatility: 5 },
+    'NQUSD': { basePrice: 21250, volatility: 25 },
+    'GCUSD': { basePrice: 3325, volatility: 6 },
+    'CLUSD': { basePrice: 62.4, volatility: 0.35 },
+    'KOSPI': { basePrice: 1186, volatility: 2.5 },
+    'HSIUSD': { basePrice: 21380, volatility: 40 },
   };
   const { basePrice, volatility } = config[symbol] || config['GCUSD'];
   const data: CandleData[] = [];

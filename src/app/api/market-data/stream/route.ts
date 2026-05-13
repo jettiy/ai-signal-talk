@@ -5,7 +5,21 @@
 import { getQuotes } from '@/lib/fmp';
 import type { Quote } from '@/lib/types';
 
-const SYMBOLS = ['NQUSD', 'GCUSD', 'CLUSD', 'AAPL', 'NVDA', 'TSLA', 'META', 'MSFT', 'AMZN', 'SPY', 'QQQ'];
+const SYMBOLS = [
+  'NQUSD',
+  'GCUSD',
+  'CLUSD',
+  'KOSPI',
+  'HSIUSD',
+  'AAPL',
+  'NVDA',
+  'TSLA',
+  'META',
+  'MSFT',
+  'AMZN',
+  'SPY',
+  'QQQ',
+];
 const POLL_INTERVAL = 10000; // 10초
 const CACHE_TTL = 5000; // 5초 캐시
 
