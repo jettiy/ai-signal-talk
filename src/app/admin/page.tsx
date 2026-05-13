@@ -62,7 +62,7 @@ interface DailySignupsResponse {
 
 function getToken(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('token');
+  return localStorage.getItem('access_token');
 }
 
 async function fetchJSON<T>(url: string): Promise<T> {
@@ -593,7 +593,7 @@ export default function AdminPage() {
         >
           <div className="flex items-center gap-3">
             <ShieldAlert className="w-5 h-5" style={{ color: '#00FF41' }} />
-            <h1 className="text-sm font-black" style={{ color: '#FFF' }}>AI 시그널톡 관리자</h1>
+            <h1 className="text-sm font-black" style={{ color: '#FFF' }}>SignalChart 관리자</h1>
             <span
               className="text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1"
               style={{ background: 'rgba(0,255,65,0.1)', color: '#00FF41', border: '1px solid rgba(0,255,65,0.2)' }}

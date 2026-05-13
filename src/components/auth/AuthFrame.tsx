@@ -13,12 +13,9 @@ export default function AuthFrame({ children, maxWidth = 'max-w-[430px]' }: Auth
     <main className="auth-terminal-bg min-h-screen px-5 py-8 text-white">
       <section className={`mx-auto flex min-h-[calc(100vh-4rem)] w-full ${maxWidth} flex-col items-center justify-center`}>
         <header className="mb-9 flex flex-col items-center text-center">
-          <SignalChartLogo iconSize={34} />
-          <h1 className="mt-4 text-[28px] font-black leading-none tracking-normal text-white sm:text-[32px]">
-            {'AI \uC2DC\uADF8\uB110\uD1A1'}
-          </h1>
-          <p className="mt-3 text-sm font-medium text-white/45">
-            {'\uC2E4\uC2DC\uAC04 \uD22C\uC790 \uC2DC\uADF8\uB110\uACFC \uD2B8\uB808\uC774\uB354 \uCEE4\uBBA4\uB2C8\uD2F0'}
+          <SignalChartLogo iconSize={44} showText fontSize={28} stacked className="justify-center" />
+          <p className="mt-5 max-w-[340px] text-sm font-semibold leading-relaxed text-white/48">
+            {'AI \uC2DC\uADF8\uB110\uD1A1 · \uC2E4\uC2DC\uAC04 \uD22C\uC790 \uC2DC\uADF8\uB110\uACFC \uD2B8\uB808\uC774\uB354 \uCEE4\uBBA4\uB2C8\uD2F0'}
           </p>
         </header>
 

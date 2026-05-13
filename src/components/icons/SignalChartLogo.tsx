@@ -1,5 +1,7 @@
 'use client';
 
+import { useId } from 'react';
+
 interface SignalChartLogoProps {
   iconSize?: number;
   fontSize?: number;
@@ -8,6 +10,7 @@ interface SignalChartLogoProps {
   stacked?: boolean;
 }
 
+/** 공식 `ai-signal-talk-logo.svg` geometry (viewBox 160×70). 그라데이션·필터 id는 인스턴스마다 유일하게 분리. */
 export default function SignalChartLogo({
   iconSize = 40,
   fontSize = 26,
@@ -15,6 +18,13 @@ export default function SignalChartLogo({
   className = '',
   stacked = false,
 }: SignalChartLogoProps) {
+  const rid = useId().replace(/:/g, '');
+  const barGradient = `barGradient-${rid}`;
+  const arrowGradient = `arrowGradient-${rid}`;
+  const neonGlow = `neonGlow-${rid}`;
+
+  const h = (iconSize * 70) / 160;
+
   return (
     <div
       className={`flex ${stacked ? 'flex-col items-center' : 'items-center'} ${className}`}
@@ -22,58 +32,102 @@ export default function SignalChartLogo({
     >
       <svg
         width={iconSize}
-        height={iconSize}
-        viewBox="0 0 48 48"
+        height={h}
+        viewBox="0 0 160 70"
+        fill="none"
         xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
+        aria-hidden={showText ? true : undefined}
+        role={showText ? undefined : 'img'}
+        aria-label={showText ? undefined : 'AI 시그널톡 로고'}
         style={{ flexShrink: 0 }}
       >
         <defs>
-          <linearGradient id="signal-candle" x1="0" y1="48" x2="0" y2="0">
-            <stop offset="0" stopColor="#00C030" />
-            <stop offset="1" stopColor="#00FF41" />
+          <linearGradient
+            id={barGradient}
+            x1="45"
+            y1="50"
+            x2="45"
+            y2="20"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0" stopColor="#00C853" />
+            <stop offset="1" stopColor="#00FF57" />
           </linearGradient>
-          <linearGradient id="signal-trend" x1="12" y1="34" x2="38" y2="10">
-            <stop offset="0" stopColor="#00C030" />
-            <stop offset="1" stopColor="#00FF41" />
+          <linearGradient
+            id={arrowGradient}
+            x1="43"
+            y1="47"
+            x2="112"
+            y2="18"
+            gradientUnits="userSpaceOnUse"
+          >
+            <stop offset="0" stopColor="#00E64D" />
+            <stop offset="0.52" stopColor="#00FF57" />
+            <stop offset="1" stopColor="#8CFF7A" />
           </linearGradient>
-          <filter id="signal-glow" x="-40%" y="-40%" width="180%" height="180%" colorInterpolationFilters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="blur" />
+          <filter id={neonGlow} x="20" y="0" width="125" height="70" filterUnits="userSpaceOnUse">
+            <feGaussianBlur stdDeviation="2.4" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="0 0 0 0 0  0 0 0 0 1  0 0 0 0 0.35  0 0 0 0.75 0"
+              result="glow"
+            />
             <feMerge>
-              <feMergeNode in="blur" />
+              <feMergeNode in="glow" />
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
         </defs>
-        <rect x="8" y="14" width="32" height="24" rx="4" fill="rgba(255,255,255,0.04)" />
-        <g stroke="url(#signal-candle)" strokeLinecap="round">
-          <line x1="14" y1="18" x2="14" y2="32" strokeWidth="1.5" />
-          <line x1="23" y1="14" x2="23" y2="31" strokeWidth="1.5" />
-          <line x1="32" y1="12" x2="32" y2="29" strokeWidth="1.5" />
-        </g>
-        <g fill="url(#signal-candle)">
-          <rect x="11" y="22" width="6" height="10" rx="1" />
-          <rect x="20" y="19" width="6" height="12" rx="1" />
-          <rect x="29" y="16" width="6" height="13" rx="1" />
-        </g>
-        <g filter="url(#signal-glow)" stroke="url(#signal-trend)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10 33.5 L20 29 L28 24 L36 16" fill="none" />
-          <path d="M36 16 L33 16.8 L38.5 12" fill="none" />
+
+        <g filter={`url(#${neonGlow})`}>
+          <rect x="39" y="41" width="13" height="15" rx="2" fill={`url(#${barGradient})`} />
+          <rect
+            x="60"
+            y="32"
+            width="13"
+            height="24"
+            rx="2"
+            fill={`url(#${barGradient})`}
+            opacity="0.92"
+          />
+          <rect
+            x="81"
+            y="23"
+            width="13"
+            height="33"
+            rx="2"
+            fill={`url(#${barGradient})`}
+            opacity="0.86"
+          />
+          <path
+            d="M35 50C51 43 66 34 82 24C91 18 98 13 111 8"
+            stroke={`url(#${arrowGradient})`}
+            strokeWidth="7"
+            strokeLinecap="round"
+          />
+          <path d="M104 7L121 2L116 20L111 12L104 7Z" fill={`url(#${arrowGradient})`} />
+          <path
+            d="M38 48C54 41 68 32 82 23C91 17 99 12 112 7"
+            stroke="#B6FF9A"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            opacity="0.85"
+          />
         </g>
       </svg>
 
       {showText && (
         <span
-          className="select-none whitespace-nowrap font-black text-white"
+          className="select-none whitespace-nowrap font-black tracking-tight text-white"
           style={{
             fontSize,
             lineHeight: 1,
-            letterSpacing: 0,
-            textShadow: '0 2px 16px rgba(0, 255, 65, 0.18)',
+            textShadow: '0 2px 20px rgba(0, 255, 87, 0.22)',
           }}
         >
-          <span className="text-[#00FF41]">AI</span>
-          {' \uC2DC\uADF8\uB110\uD1A1'}
+          <span className="text-white">Signal</span>
+          <span className="text-[#00FF57]">Chart</span>
         </span>
       )}
     </div>
