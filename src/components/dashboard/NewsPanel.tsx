@@ -106,9 +106,9 @@ function TranslationLoadingCard() {
     <div className="flex h-64 items-center justify-center rounded-xl border border-[#00FF41]/15 bg-[#00FF41]/5">
       <div className="text-center">
         <Loader2 size={26} className="mx-auto mb-3 animate-spin text-[#00FF41]" />
-        <p className="text-sm font-black text-[#00FF41]">AI가 뉴스를 번역 중입니다</p>
+        <p className="text-sm font-black text-[#00FF41]">뉴스를 불러오는 중</p>
         <p className="mt-2 text-xs leading-5 text-zinc-500">
-          글로벌 뉴스 원문을 수집하고 한국어로 정리하는 중입니다.
+          글로벌 뉴스 원문을 수집하고 있습니다. 본문은 원문이며, 각 기사에서 번역을 선택할 수 있습니다.
         </p>
       </div>
     </div>
@@ -265,7 +265,7 @@ export default function NewsPanel() {
           실시간 인텔리전스 피드
         </div>
         <h1 className="mb-2 text-3xl font-bold text-white lg:text-4xl">글로벌 뉴스 센터</h1>
-        <p className="text-sm text-zinc-400">주요 경제 뉴스는 AI가 한국어로 번역하고, 지표 데이터는 출처와 함께 표시합니다.</p>
+        <p className="text-sm text-zinc-400">원문 피드를 빠르게 불러오며, 필요 시 항목에서 번역을 선택할 수 있습니다.</p>
       </div>
 
       <div className="mb-6 flex items-center gap-2">

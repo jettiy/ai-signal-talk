@@ -162,7 +162,7 @@ export async function translateNewsToKorean(
     const itemsJson = needsTranslation.map((n, i) => ({
       index: i,
       title: n.title,
-      text: n.text.slice(0, 300),
+      text: (n.text || '').slice(0, 300),
     }));
 
     const res = await fetch(`${ZAI_BASE}/chat/completions`, {

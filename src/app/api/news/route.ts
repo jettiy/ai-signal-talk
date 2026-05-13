@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchBloombergNews, fetchSeekingAlphaNews, fetchYahooNews } from '@/lib/rss-news';
-import { translateNewsToKorean } from '@/lib/zai-web-search';
 import type { NewsItem } from '@/lib/types';
 
 // ═══════════════════════════════════════════════════════════
@@ -88,9 +87,6 @@ export async function GET(req: NextRequest) {
   const symbol = searchParams.get('symbol') || '';
   const category = searchParams.get('category') || ''; // 인터페이스 유지
   const mode = searchParams.get('mode') || 'column';
-  /** `translate=0` 또는 `NEWS_SKIP_TRANSLATE=1`이면 Z.AI 번역 생략(첫 로딩 단축) */
-  const skipTranslate =
-    process.env.NEWS_SKIP_TRANSLATE === '1' || searchParams.get('translate') === '0';
   void category;
 
   // ── 1. RSS + GDELT 병렬 수집 ────────────────────────
@@ -131,16 +127,10 @@ export async function GET(req: NextRequest) {
     filteredNews = scored.length > 0 ? scored.slice(0, 20) : uniqueNews.slice(0, 15);
   }
 
-  // ── 4. 한국어 번역 (옵션으로 생략 가능) ─────────────
-  const translatedNews = skipTranslate
-    ? filteredNews
-    : await translateNewsToKorean(filteredNews);
+  // ── 4. 원문 그대로 반환 (번역은 /api/news/translate 에서 항목별 요청) ──
+  const enriched = filteredNews.filter((item) => item.url && item.url.startsWith('http'));
 
-  // ── 5. URL 최종 검증 — 유효한 URL만 남김 ────────────
-  const enriched = translatedNews
-    .filter((item) => item.url && item.url.startsWith('http'));
-
-  // ── 6. 캐시 ──────────────────────────────────────────
+  // ── 5. 캐시 ──────────────────────────────────────────
   const cacheMaxAge = mode === 'breaking' ? 300 : 3600;
 
   return NextResponse.json(enriched.slice(0, 20), {

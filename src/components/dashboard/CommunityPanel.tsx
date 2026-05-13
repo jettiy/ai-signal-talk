@@ -6,6 +6,7 @@ import {
   Clock,
   Flame,
   Hash,
+  Languages,
   Loader2,
   MessageCircle,
   Newspaper,
@@ -142,6 +143,19 @@ function formatRelativeTime(value?: string) {
   return `${Math.floor(diffHour / 24)}일 전`;
 }
 
+/** 제목이 영어 위주일 때만 '번역' 노출 (간단 휴리스틱) */
+function isLikelyEnglishTitle(title: string): boolean {
+  const sample = title.slice(0, 80);
+  const koreanChars = (sample.match(/[가-힣]/g) || []).length;
+  const englishChars = (sample.match(/[a-zA-Z]/g) || []).length;
+  return englishChars > koreanChars * 2 && englishChars > 8;
+}
+
+function newsRowKey(news: NewsItem, index: number): string {
+  if (news.url && news.url.startsWith('http')) return news.url;
+  return `fallback-${index}-${(news.title || '').slice(0, 40)}`;
+}
+
 function getWsUrl(channelId: number, token: string) {
   const base = BACKEND_HTTP_URL.replace(/\/+$/, '');
   const wsBase = base.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
@@ -203,6 +217,10 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
   const [signalResult, setSignalResult] = useState<SignalResult | null>(null);
   const [socketStatus, setSocketStatus] = useState<SocketStatus>('authenticating');
   const [now, setNow] = useState(() => new Date());
+  /** 뉴스 URL(또는 fallback 키) → 사용자 요청 번역 결과 */
+  const [newsTranslateByKey, setNewsTranslateByKey] = useState<
+    Record<string, { title?: string; loading?: boolean; error?: string }>
+  >({});
   const [channels, setChannels] = useState<Channel[]>([]);
   const [activeChannelId, setActiveChannelId] = useState<number | null>(null);
   const [activeChannelTab, setActiveChannelTab] = useState('global');
@@ -218,6 +236,31 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
   const change = quote?.changesPercentage ?? 0;
   const direction = change >= 0 ? 'buy' : 'sell';
   const newsItems = ((newsData && newsData.length > 0 ? newsData : FALLBACK_NEWS) as NewsItem[]).slice(0, 30);
+
+  const requestNewsTranslate = async (news: NewsItem, key: string) => {
+    setNewsTranslateByKey((prev) => ({ ...prev, [key]: { ...prev[key], loading: true, error: undefined } }));
+    try {
+      const res = await fetch('/api/news/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item: news }),
+      });
+      const data = (await res.json()) as { title?: string; error?: string };
+      if (!res.ok) throw new Error(data.error || '번역에 실패했습니다.');
+      setNewsTranslateByKey((prev) => ({
+        ...prev,
+        [key]: { title: data.title, loading: false },
+      }));
+    } catch (err) {
+      setNewsTranslateByKey((prev) => ({
+        ...prev,
+        [key]: {
+          loading: false,
+          error: err instanceof Error ? err.message : '번역 실패',
+        },
+      }));
+    }
+  };
 
   const connectionText = useMemo(() => {
     if (socketStatus === 'open') return '연결됨';
@@ -505,10 +548,10 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
             <div className="mx-4 my-3 border border-[#00FF41]/15 bg-[#00FF41]/5 px-3 py-4">
               <div className="mb-2 flex items-center gap-2">
                 <Loader2 size={14} className="animate-spin text-[#00FF41]" />
-                <span className="text-xs font-black text-[#00FF41]">AI가 뉴스를 번역 중입니다</span>
+                <span className="text-xs font-black text-[#00FF41]">실시간 뉴스를 불러오는 중</span>
               </div>
               <p className="text-[11px] leading-5 text-white/45">
-                해외 주요 속보를 수집하고 한국어로 정리하고 있습니다. 잠시만 기다려주세요.
+                해외 속보를 수집하고 있습니다. 제목은 원문이며, 필요할 때 항목별「번역」을 눌러 한국어로 볼 수 있습니다.
               </p>
             </div>
           )}
@@ -516,6 +559,10 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
           {newsItems.map((news, index) => {
             const impact = IMPACT_MAP[(news.impact || 'medium') as keyof typeof IMPACT_MAP] || IMPACT_MAP.medium;
             const url = news.url && news.url !== '#' ? news.url : undefined;
+            const rowKey = newsRowKey(news, index);
+            const tr = newsTranslateByKey[rowKey];
+            const displayTitle = tr?.title || news.title || '뉴스 제목을 불러오는 중입니다.';
+            const showTranslateBtn = isLikelyEnglishTitle(news.title || '');
             return (
               <a
                 key={news.id || news.title || index}
@@ -534,16 +581,48 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
                     {formatRelativeTime(news.publishedDate || news.time)}
                   </span>
                 </div>
-                <p className="mb-1.5 line-clamp-2 text-[11px] font-semibold leading-snug text-white">
-                  {news.title || '뉴스 제목을 불러오는 중입니다.'}
-                </p>
-                <div className="flex items-center gap-1.5">
+                <p className="mb-1.5 line-clamp-2 text-[11px] font-semibold leading-snug text-white">{displayTitle}</p>
+                {tr?.error && (
+                  <p className="mb-1 text-[9px] font-bold text-red-400/90">{tr.error}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-1.5">
                   {news.symbol && (
                     <span className="rounded border border-[#00FF41]/15 bg-[#0D0D0D] px-1 py-0.5 font-mono text-[8px] font-bold text-[#00FF41]">
                       {news.symbol}
                     </span>
                   )}
                   <span className="ml-auto text-[8px] text-white/28">{news.source || 'Market'}</span>
+                  {showTranslateBtn && url && (
+                    <button
+                      type="button"
+                      className="ml-1 inline-flex items-center gap-0.5 rounded border border-[#00FF41]/25 bg-black/50 px-1.5 py-0.5 text-[8px] font-black text-[#00FF41] hover:border-[#00FF41]/60 disabled:opacity-40"
+                      disabled={!!tr?.loading || !!(tr?.title && tr.title !== news.title)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!tr?.loading && !(tr?.title && tr.title !== news.title)) {
+                          void requestNewsTranslate(news, rowKey);
+                        }
+                      }}
+                    >
+                      {tr?.loading ? (
+                        <>
+                          <Loader2 size={9} className="animate-spin" />
+                          번역 중
+                        </>
+                      ) : tr?.title && tr.title !== news.title ? (
+                        <>
+                          <Languages size={9} />
+                          번역됨
+                        </>
+                      ) : (
+                        <>
+                          <Languages size={9} />
+                          번역
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </a>
             );
