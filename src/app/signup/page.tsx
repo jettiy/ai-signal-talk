@@ -9,6 +9,22 @@ import AuthCard from '@/components/auth/AuthCard';
 import AuthField from '@/components/auth/AuthField';
 import AuthFrame from '@/components/auth/AuthFrame';
 
+function parseApiDetail(data: Record<string, unknown>): string {
+  if (typeof data.detail === 'string') return data.detail;
+  if (Array.isArray(data.detail) && data.detail.length > 0) {
+    const first = data.detail[0] as { msg?: string };
+    if (typeof first?.msg === 'string') return first.msg;
+  }
+  if (typeof data.error === 'string') return data.error;
+  return '';
+}
+
+type DialogState = {
+  variant: 'ok' | 'warn';
+  title: string;
+  body: string;
+} | null;
+
 export default function SignupPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -19,29 +35,109 @@ export default function SignupPage() {
   const [emailChecked, setEmailChecked] = useState(false);
   const [nicknameChecked, setNicknameChecked] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkBusy, setCheckBusy] = useState<'email' | 'nickname' | null>(null);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [dialog, setDialog] = useState<DialogState>(null);
 
-  const checkEmail = () => {
+  const checkEmail = async () => {
     setError('');
-    if (!email.includes('@')) {
+    setMessage('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setEmailChecked(false);
-      setError('사용할 아이디를 이메일 형식으로 입력해주세요.');
+      setError('사용할 아이디를 올바른 이메일 형식으로 입력해주세요.');
       return;
     }
-    setEmailChecked(true);
-    setMessage('사용 가능한 아이디입니다.');
+
+    setCheckBusy('email');
+    try {
+      const response = await fetch(
+        `/api/auth/check-email?email=${encodeURIComponent(email.trim())}`
+      );
+      const data = (await response.json()) as Record<string, unknown>;
+
+      if (!response.ok) {
+        setEmailChecked(false);
+        const detail = parseApiDetail(data) || '아이디 중복 확인에 실패했습니다.';
+        setError(detail);
+        setDialog({ variant: 'warn', title: '확인 불가', body: detail });
+        return;
+      }
+
+      const available = data.available === true;
+      setEmailChecked(available);
+      const body =
+        typeof data.message === 'string'
+          ? data.message
+          : available
+            ? '사용 가능한 아이디입니다.'
+            : '이미 사용 중인 이메일입니다.';
+      setDialog({
+        variant: available ? 'ok' : 'warn',
+        title: available ? '아이디 사용 가능' : '이미 사용 중',
+        body,
+      });
+      if (!available) {
+        setError(typeof data.message === 'string' ? data.message : '이미 사용 중인 이메일입니다.');
+      }
+    } catch {
+      setEmailChecked(false);
+      const msg = '중복 확인 중 오류가 발생했습니다.';
+      setError(msg);
+      setDialog({ variant: 'warn', title: '오류', body: msg });
+    } finally {
+      setCheckBusy(null);
+    }
   };
 
-  const checkNickname = () => {
+  const checkNickname = async () => {
     setError('');
+    setMessage('');
     if (nickname.trim().length < 2) {
       setNicknameChecked(false);
       setError('닉네임은 2자 이상 입력해주세요.');
       return;
     }
-    setNicknameChecked(true);
-    setMessage('사용 가능한 닉네임입니다.');
+
+    setCheckBusy('nickname');
+    try {
+      const response = await fetch(
+        `/api/auth/check-nickname?nickname=${encodeURIComponent(nickname.trim())}`
+      );
+      const data = (await response.json()) as Record<string, unknown>;
+
+      if (!response.ok) {
+        setNicknameChecked(false);
+        const detail = parseApiDetail(data) || '닉네임 중복 확인에 실패했습니다.';
+        setError(detail);
+        setDialog({ variant: 'warn', title: '확인 불가', body: detail });
+        return;
+      }
+
+      const available = data.available === true;
+      setNicknameChecked(available);
+      const body =
+        typeof data.message === 'string'
+          ? data.message
+          : available
+            ? '사용 가능한 닉네임입니다.'
+            : '이미 사용 중인 닉네임입니다.';
+      setDialog({
+        variant: available ? 'ok' : 'warn',
+        title: available ? '닉네임 사용 가능' : '이미 사용 중',
+        body,
+      });
+      if (!available) {
+        setError(typeof data.message === 'string' ? data.message : '이미 사용 중인 닉네임입니다.');
+      }
+    } catch {
+      setNicknameChecked(false);
+      const msg = '중복 확인 중 오류가 발생했습니다.';
+      setError(msg);
+      setDialog({ variant: 'warn', title: '오류', body: msg });
+    } finally {
+      setCheckBusy(null);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -67,13 +163,19 @@ export default function SignupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, nickname, password }),
       });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || '회원가입에 실패했습니다.');
+      let data: Record<string, unknown> = {};
+      try {
+        data = (await response.json()) as Record<string, unknown>;
+      } catch {
+        throw new Error('서버 응답을 읽을 수 없습니다. 잠시 후 다시 시도해주세요.');
       }
 
-      localStorage.setItem('access_token', data.access_token);
+      if (!response.ok) {
+        const msg = parseApiDetail(data) || '회원가입에 실패했습니다.';
+        throw new Error(msg);
+      }
+
+      localStorage.setItem('access_token', data.access_token as string);
       localStorage.setItem('user', JSON.stringify(data.user));
       router.push('/signup/success');
     } catch (err) {
@@ -108,10 +210,11 @@ export default function SignupPage() {
             />
             <button
               type="button"
-              className="mt-6 h-12 border border-[#00FF41]/20 bg-black/65 text-xs font-black text-[#00FF41] hover:border-[#00FF41]/70"
+              disabled={checkBusy === 'email'}
+              className="mt-6 h-12 border border-[#00FF41]/20 bg-black/65 text-xs font-black text-[#00FF41] hover:border-[#00FF41]/70 disabled:opacity-40"
               onClick={checkEmail}
             >
-              중복확인
+              {checkBusy === 'email' ? '확인 중' : '중복확인'}
             </button>
           </div>
 
@@ -131,10 +234,11 @@ export default function SignupPage() {
             />
             <button
               type="button"
-              className="mt-6 h-12 border border-[#00FF41]/20 bg-black/65 text-xs font-black text-[#00FF41] hover:border-[#00FF41]/70"
+              disabled={checkBusy === 'nickname'}
+              className="mt-6 h-12 border border-[#00FF41]/20 bg-black/65 text-xs font-black text-[#00FF41] hover:border-[#00FF41]/70 disabled:opacity-40"
               onClick={checkNickname}
             >
-              중복확인
+              {checkBusy === 'nickname' ? '확인 중' : '중복확인'}
             </button>
           </div>
 
@@ -196,6 +300,40 @@ export default function SignupPage() {
           </Link>
         </p>
       </AuthCard>
+
+      {dialog && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="signup-dialog-title"
+        >
+          <div
+            className={`w-full max-w-sm border px-6 py-7 text-center shadow-[0_0_48px_rgba(0,0,0,0.65)] ${
+              dialog.variant === 'ok'
+                ? 'border-[#00FF41]/40 bg-[#050805]'
+                : 'border-red-500/35 bg-[#0a0505]'
+            }`}
+          >
+            <p
+              id="signup-dialog-title"
+              className={`text-lg font-black ${
+                dialog.variant === 'ok' ? 'text-[#00FF41]' : 'text-red-300'
+              }`}
+            >
+              {dialog.title}
+            </p>
+            <p className="mt-3 text-sm font-bold leading-relaxed text-white/82">{dialog.body}</p>
+            <button
+              type="button"
+              className="mt-7 w-full border border-[#00FF41]/30 bg-black/80 py-3 text-sm font-black text-[#00FF41] hover:border-[#00FF41]/80"
+              onClick={() => setDialog(null)}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </AuthFrame>
   );
 }

@@ -6,24 +6,18 @@ export async function POST(req: NextRequest) {
     const { email, password, nickname } = await req.json();
 
     if (!email || !password || !nickname) {
-      return NextResponse.json(
-        { error: '모든 필드를 입력해주세요.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ detail: '모든 필드를 입력해주세요.' }, { status: 400 });
     }
 
     // 이메일 형식 검증
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json(
-        { error: '올바른 이메일 형식을 입력해주세요.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ detail: '올바른 이메일 형식을 입력해주세요.' }, { status: 400 });
     }
 
     // 비밀번호 검증
     if (password.length < 8 || !/[a-zA-Z]/.test(password) || !/[0-9]/.test(password)) {
       return NextResponse.json(
-        { error: '비밀번호는 영문+숫자 8자 이상이어야 합니다.' },
+        { detail: '비밀번호는 영문+숫자 8자 이상이어야 합니다.' },
         { status: 400 }
       );
     }
@@ -35,19 +29,32 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({ email, password, nickname }),
     });
 
-    const data = await res.json();
+    let data: Record<string, unknown>;
+    try {
+      data = (await res.json()) as Record<string, unknown>;
+    } catch {
+      return NextResponse.json(
+        { detail: '백엔드 응답을 해석할 수 없습니다. 서버 상태를 확인해주세요.' },
+        { status: 502 }
+      );
+    }
 
     if (!res.ok) {
-      return NextResponse.json(
-        { error: data.detail || '회원가입에 실패했습니다.' },
-        { status: res.status }
-      );
+      const detail =
+        typeof data.detail === 'string'
+          ? data.detail
+          : Array.isArray(data.detail)
+            ? String((data.detail[0] as { msg?: string })?.msg ?? data.detail[0])
+            : typeof data.error === 'string'
+              ? data.error
+              : '회원가입에 실패했습니다.';
+      return NextResponse.json({ detail }, { status: res.status });
     }
 
     return NextResponse.json(data);
   } catch {
     return NextResponse.json(
-      { error: '서버 연결에 실패했습니다.' },
+      { detail: '서버 연결에 실패했습니다.' },
       { status: 500 }
     );
   }
