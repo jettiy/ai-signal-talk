@@ -149,9 +149,9 @@ export default function CommunityPanel({ userName: _userName }: CommunityPanelPr
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#313338]">
+    <div className="flex flex-col h-full">
       {/* ── 헤더 ── */}
-      <div className="flex items-center gap-2 px-4 h-12 border-b border-[#1E1F22] bg-[#313338] shrink-0">
+      <div className="flex items-center gap-2 px-4 h-12 border-b border-[#1A1A1A] shrink-0">
         <span className="text-[#DBDEE1] font-bold text-base">💬 시그널톡</span>
         <span className="text-[#6D6F78] text-sm ml-auto">
           {onlineCount > 0 ? (
@@ -168,7 +168,7 @@ export default function CommunityPanel({ userName: _userName }: CommunityPanelPr
       {/* ── 메시지 영역 ── */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#1E1F22]"
+        className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-[#1E1F22] bg-[#1A1A1E]"
       >
         {/* 로딩 상태 */}
         {messages.length === 0 && (
@@ -245,7 +245,7 @@ export default function CommunityPanel({ userName: _userName }: CommunityPanelPr
       </div>
 
       {/* ── 입력바 ── */}
-      <div className="px-4 py-3 bg-[#313338] shrink-0 border-t border-[#1E1F22]">
+      <div className="px-4 py-3 shrink-0 border-t border-[#1A1A1A]">
         <div className="flex items-center gap-2 bg-[#383A40] rounded-lg px-3 py-2">
           <input
             ref={inputRef}
@@ -307,12 +307,12 @@ function MessageItem({
         </div>
       ) : isConsecutive ? (
         /* 연속 메시지 — 내용만 */
-        <div className="px-4 pl-[72px] py-[1px] group hover:bg-[#2E3035]">
+        <div className="px-4 pl-[72px] py-[1px] group hover:bg-[#1A1A1E]">
           <MessageContent message={message} />
         </div>
       ) : (
         /* 첫 메시지 — 아바타 + 닉네임 + 내용 */
-        <div className="px-4 pt-[17px] pb-[1px] group hover:bg-[#2E3035]">
+        <div className="px-4 pt-[17px] pb-[1px] group hover:bg-[#1A1A1E]">
           <div className="flex gap-4">
             {/* 아바타 */}
             <div className="w-10 h-10 rounded-full shrink-0 flex items-center justify-center text-white text-sm font-bold relative"

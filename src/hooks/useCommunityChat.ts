@@ -82,7 +82,7 @@ export function useCommunityChat() {
   /* ---------- 이전 메시지 불러오기 ---------- */
   const loadHistory = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token') || '';
+      const token = localStorage.getItem('access_token') || '';
       const res = await fetch(`${HTTP_URL}/api/v2/chat/messages`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -100,7 +100,7 @@ export function useCommunityChat() {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    const token = localStorage.getItem('token') || '';
+    const token = localStorage.getItem('access_token') || '';
     const url = `${WS_URL}?token=${encodeURIComponent(token)}`;
 
     setStatus('connecting');
