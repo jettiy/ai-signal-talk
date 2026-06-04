@@ -10,11 +10,52 @@ const FMP_SOURCE_URL = 'https://site.financialmodelingprep.com/developer/docs/ec
 
 // ─── 심볼 매핑: 내부 심볼 ↔ FMP (선물·지수는 `=F` 연속계약, ws-relay와 동일) ───
 const INTERNAL_TO_FMP: Record<string, string> = {
-  NQUSD: 'NQ=F',
-  GCUSD: 'GC=F',
-  CLUSD: 'CL=F',
-  KSUSD: 'KS=F',
+  GCUSD: 'GCUSD',   // 금 선물 — FMP 실시간
+  ESUSD: 'ESUSD',   // S&P 500 선물 — FMP 실시간 (참고용)
 };
+
+// ═══════════════════════════════════════════════════════════
+//  yfinance 백엔드 시세
+// ═══════════════════════════════════════════════════════════
+const BACKEND_URL = process.env.BACKEND_URL || 'https://ai-signal-talk-backend.onrender.com';
+
+async function getYfinanceQuotes(symbols: string[]): Promise<Quote[]> {
+  const res = await fetch(`${BACKEND_URL}/api/v2/quotes`, {
+    cache: 'no-store',
+    headers: { 'Accept': 'application/json' },
+  } as RequestInit);
+  if (!res.ok) return [];
+  const data: Array<{
+    symbol: string;
+    price: number;
+    change: number;
+    changePct: number;
+    high: number;
+    low: number;
+    volume: number;
+  }> = await res.json();
+
+  return data.map((d) => ({
+    symbol: d.symbol,
+    price: d.price,
+    changesPercentage: d.changePct,
+    change: d.change,
+    dayLow: d.low,
+    dayHigh: d.high,
+    yearHigh: 0,
+    yearLow: 0,
+    marketCap: 0,
+    priceAvg50: 0,
+    priceAvg200: 0,
+    volume: d.volume,
+    avgVolume: 0,
+    exchange: '',
+    open: 0,
+    previousClose: d.price - d.change,
+    eps: 0,
+    pe: 0,
+  }));
+}
 
 // ═══════════════════════════════════════════════════════════
 //  실시간 시세 (Quote)
@@ -23,16 +64,29 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
   const mocks = getMockQuotes(symbols);
   const mockMap = new Map(mocks.map((q) => [q.symbol, q]));
 
-  if (!FMP_API_KEY) return mocks;
-
+  // 백엔드 yfinance 시세 먼저 시도
   try {
-    const live = await fmpGetQuotes(symbols);
-    if (live.length === 0) return mocks;
-    return symbols.map((sym) => live.find((q) => q.symbol === sym) || mockMap.get(sym)!).filter(Boolean) as Quote[];
+    const backendQuotes = await getYfinanceQuotes(symbols);
+    if (backendQuotes.length > 0) {
+      return symbols.map((sym) => backendQuotes.find((q) => q.symbol === sym) || mockMap.get(sym)!).filter(Boolean) as Quote[];
+    }
   } catch (e) {
-    console.warn('[FMP] getQuotes 실패, mock 폴백:', e);
-    return mocks;
+    console.warn('[yfinance] 백엔드 시세 실패:', e);
   }
+
+  // FMP 시세 시도 (금 등)
+  if (FMP_API_KEY) {
+    try {
+      const live = await fmpGetQuotes(symbols);
+      if (live.length > 0) {
+        return symbols.map((sym) => live.find((q) => q.symbol === sym) || mockMap.get(sym)!).filter(Boolean) as Quote[];
+      }
+    } catch (e) {
+      console.warn('[FMP] getQuotes 실패:', e);
+    }
+  }
+
+  return mocks;
 }
 
 function quoteFromFmpRow(raw: Record<string, unknown>, internalSymbol: string): Quote {
@@ -186,57 +240,38 @@ export async function getNews(symbol = ''): Promise<NewsItem[]> {
 
 // Economic calendar from FMP. Used by News Room sidebar for US macro releases.
 export async function getEconomicCalendar(): Promise<EconomicCalendarItem[]> {
-  if (!FMP_API_KEY) return getMockEconomicCalendar();
-
-  const now = new Date();
-  const from = new Date(now);
-  from.setDate(now.getDate() - 14);
-  const to = new Date(now);
-  to.setDate(now.getDate() + 14);
-
-  const params = new URLSearchParams({
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
-    apikey: FMP_API_KEY,
-  });
-
+  // 무료 경제지표 캘린더 (Investing.com / faireconomy.media)
   try {
-    const res = await fetch(`${FMP_BASE}/economic-calendar?${params.toString()}`, {
+    const res = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', {
       cache: 'no-store',
     } as RequestInit);
-
-    if (!res.ok) throw new Error(`FMP Economic Calendar error: ${res.status}`);
+    if (!res.ok) throw new Error(`Economic Calendar error: ${res.status}`);
     const data = await res.json();
     if (!Array.isArray(data)) return getMockEconomicCalendar();
 
     return data
       .filter((item: Record<string, unknown>) => {
-        const country = String(item.country || '').toUpperCase();
-        const event = String(item.event || item.name || '');
-        return (!country || country === 'US' || country === 'UNITED STATES') && event;
+        const impact = String(item.impact || '').toLowerCase();
+        return impact === 'high' || impact === 'medium';
       })
       .map((item: Record<string, unknown>, index: number) => {
-        const event = String(item.event || item.name || '');
+        const event = String(item.title || item.event || '');
         return {
-          id: `${String(item.date || '')}-${event}-${index}`,
-          date: String(item.date || item.releaseDate || new Date().toISOString()),
+          id: `ec-${index}`,
+          date: String(item.date || ''),
           country: String(item.country || 'US'),
           event,
-          actual: formatMacroValue(item.actual),
-          estimate: formatMacroValue(item.estimate ?? item.consensus),
-          previous: formatMacroValue(item.previous),
-          impact: inferEconomicImpact(event),
-          source: 'Financial Modeling Prep',
-          sourceUrl: FMP_SOURCE_URL,
+          actual: String(item.actual || '-'),
+          estimate: String(item.forecast || '-'),
+          previous: String(item.previous || '-'),
+          impact: (String(item.impact || 'Medium').toLowerCase() === 'high' ? 'high' : String(item.impact || 'Medium').toLowerCase() === 'low' ? 'low' : 'medium') as 'high' | 'medium' | 'low',
+          source: 'Investing.com',
+          sourceUrl: 'https://www.investing.com/economic-calendar/',
         } satisfies EconomicCalendarItem;
       })
-      .sort((a, b) => {
-        const nowMs = Date.now();
-        return Math.abs(new Date(a.date).getTime() - nowMs) - Math.abs(new Date(b.date).getTime() - nowMs);
-      })
-      .slice(0, 6);
+      .slice(0, 8);
   } catch (error) {
-    console.error('FMP getEconomicCalendar error:', error);
+    console.error('Economic Calendar error:', error);
     return getMockEconomicCalendar();
   }
 }
