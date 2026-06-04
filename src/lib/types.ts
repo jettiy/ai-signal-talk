@@ -130,7 +130,7 @@ export interface ToolCall {
 
 // FMP 대시보드 기본 종목 (현재 구독에서 사용 가능한 심볼)
 export const FUTURES_SYMBOLS = {
-  KOSPI: { symbol: 'KOSPI', label: '코스피선물', fmpChart: 'KOSPI' },
+  KS: { symbol: 'KSUSD', label: '코스피선물', fmpChart: 'KSUSD' },
   NQ: { symbol: 'NQUSD', label: '나스닥선물', fmpChart: 'NQUSD' },
   GC: { symbol: 'GCUSD', label: '골드선물', fmpChart: 'GCUSD' },
   CL: { symbol: 'CLUSD', label: 'WTI선물', fmpChart: 'CLUSD' },
@@ -153,12 +153,9 @@ export function getPredictionType(timeframe: string): string {
   return '현재봉 마감';
 }
 
-// 기존 주식 심볼 (참고용)
+// 추적 심볼 (참고용)
 export const TRACKED_SYMBOLS = [
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'AMD', 'INTC',
-  'SPY', 'QQQ', 'DIA', 'IWM',
-  'GLD', 'SLV', 'USO',
-  'GCUSD', 'CLUSD', 'NQUSD', 'KOSPI',
+  'GCUSD', 'CLUSD', 'NQUSD', 'KSUSD',
 ];
 
 // ===== 유저 역할 (RBAC) =====

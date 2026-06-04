@@ -9,16 +9,7 @@ const SYMBOLS = [
   'NQUSD',
   'GCUSD',
   'CLUSD',
-  'KOSPI',
-  'HSIUSD',
-  'AAPL',
-  'NVDA',
-  'TSLA',
-  'META',
-  'MSFT',
-  'AMZN',
-  'SPY',
-  'QQQ',
+  'KSUSD',
 ];
 const POLL_INTERVAL = 10000; // 10초
 const CACHE_TTL = 5000; // 5초 캐시

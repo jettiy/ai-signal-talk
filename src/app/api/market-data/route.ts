@@ -7,16 +7,7 @@ export async function GET() {
     'NQUSD',
     'GCUSD',
     'CLUSD',
-    'KOSPI',
-    'HSIUSD',
-    'AAPL',
-    'NVDA',
-    'TSLA',
-    'META',
-    'MSFT',
-    'AMZN',
-    'SPY',
-    'QQQ',
+    'KSUSD',
   ];
   const data = await getQuotes(symbols);
 

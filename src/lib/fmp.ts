@@ -13,16 +13,7 @@ const INTERNAL_TO_FMP: Record<string, string> = {
   NQUSD: 'NQ=F',
   GCUSD: 'GC=F',
   CLUSD: 'CL=F',
-  KOSPI: 'KS=F',
-  HSIUSD: 'HSI=F',
-  AAPL: 'AAPL',
-  NVDA: 'NVDA',
-  TSLA: 'TSLA',
-  META: 'META',
-  MSFT: 'MSFT',
-  AMZN: 'AMZN',
-  SPY: 'SPY',
-  QQQ: 'QQQ',
+  KSUSD: 'KS=F',
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -336,16 +327,7 @@ export function getMockQuotes(symbols: string[]): Quote[] {
     'GCUSD': { price: 3325.4, changesPercentage: 0.13, change: 4.2, dayLow: 3298.0, dayHigh: 3340.0, yearHigh: 3500.0, yearLow: 2800.0, marketCap: 0, priceAvg50: 3280.0, priceAvg200: 3100.0, volume: 280000, avgVolume: 250000, exchange: 'COMMODITY', open: 3321.0, previousClose: 3321.2, eps: 0, pe: 0 },
     'NQUSD': { price: 21250.0, changesPercentage: 0.35, change: 74.0, dayLow: 21120.0, dayHigh: 21310.0, yearHigh: 22500.0, yearLow: 18500.0, marketCap: 0, priceAvg50: 20800.0, priceAvg200: 19800.0, volume: 150000, avgVolume: 120000, exchange: 'COMMODITY', open: 21176.0, previousClose: 21176.0, eps: 0, pe: 0 },
     'CLUSD': { price: 62.4, changesPercentage: -0.28, change: -0.18, dayLow: 61.9, dayHigh: 63.1, yearHigh: 82.5, yearLow: 55.0, marketCap: 0, priceAvg50: 65.0, priceAvg200: 71.0, volume: 250000, avgVolume: 220000, exchange: 'COMMODITY', open: 62.58, previousClose: 62.58, eps: 0, pe: 0 },
-    'KOSPI': { price: 1186.0, changesPercentage: 0.22, change: 2.6, dayLow: 1178.0, dayHigh: 1192.0, yearHigh: 1250.0, yearLow: 1080.0, marketCap: 0, priceAvg50: 1165.0, priceAvg200: 1140.0, volume: 120000, avgVolume: 110000, exchange: 'KRX', open: 1183.4, previousClose: 1183.4, eps: 0, pe: 0 },
-    'HSIUSD': { price: 21380.0, changesPercentage: -0.15, change: -32.0, dayLow: 21250.0, dayHigh: 21500.0, yearHigh: 24500.0, yearLow: 18500.0, marketCap: 0, priceAvg50: 21800.0, priceAvg200: 20500.0, volume: 90000, avgVolume: 85000, exchange: 'HKEX', open: 21412.0, previousClose: 21412.0, eps: 0, pe: 0 },
-    'AAPL': { price: 263.4, changesPercentage: 1.23, change: 3.2, dayLow: 260.0, dayHigh: 264.5, yearHigh: 270.0, yearLow: 200.0, marketCap: 4000000000000, priceAvg50: 255.0, priceAvg200: 240.0, volume: 52432100, avgVolume: 48000000, exchange: 'NASDAQ', open: 260.5, previousClose: 260.2, eps: 6.58, pe: 40.0 },
-    'NVDA': { price: 198.35, changesPercentage: 3.45, change: 6.6, dayLow: 192.0, dayHigh: 200.5, yearHigh: 210.0, yearLow: 100.0, marketCap: 4800000000000, priceAvg50: 185.0, priceAvg200: 160.0, volume: 38234500, avgVolume: 35000000, exchange: 'NASDAQ', open: 191.8, previousClose: 191.7, eps: 3.20, pe: 61.8 },
-    'TSLA': { price: 388.9, changesPercentage: -2.34, change: -9.3, dayLow: 382.0, dayHigh: 400.0, yearHigh: 420.0, yearLow: 250.0, marketCap: 1200000000000, priceAvg50: 370.0, priceAvg200: 340.0, volume: 95234000, avgVolume: 90000000, exchange: 'NASDAQ', open: 398.2, previousClose: 398.2, eps: 4.20, pe: 92.6 },
-    'SPY': { price: 701.66, changesPercentage: 0.87, change: 6.1, dayLow: 696.0, dayHigh: 703.0, yearHigh: 710.0, yearLow: 600.0, marketCap: 0, priceAvg50: 690.0, priceAvg200: 660.0, volume: 78234500, avgVolume: 75000000, exchange: 'NYSE', open: 695.6, previousClose: 695.6, eps: 22.10, pe: 31.8 },
-    'QQQ': { price: 640.47, changesPercentage: 1.15, change: 7.3, dayLow: 633.0, dayHigh: 642.0, yearHigh: 650.0, yearLow: 550.0, marketCap: 0, priceAvg50: 625.0, priceAvg200: 600.0, volume: 45234500, avgVolume: 42000000, exchange: 'NASDAQ', open: 633.2, previousClose: 633.2, eps: 9.80, pe: 65.4 },
-    'META': { price: 676.87, changesPercentage: 1.78, change: 11.8, dayLow: 665.0, dayHigh: 680.0, yearHigh: 690.0, yearLow: 500.0, marketCap: 1700000000000, priceAvg50: 650.0, priceAvg200: 600.0, volume: 18234000, avgVolume: 16000000, exchange: 'NASDAQ', open: 665.1, previousClose: 665.1, eps: 22.50, pe: 30.1 },
-    'MSFT': { price: 420.26, changesPercentage: 0.65, change: 2.7, dayLow: 417.0, dayHigh: 422.0, yearHigh: 430.0, yearLow: 370.0, marketCap: 3100000000000, priceAvg50: 410.0, priceAvg200: 390.0, volume: 22000000, avgVolume: 20000000, exchange: 'NASDAQ', open: 417.6, previousClose: 417.6, eps: 12.0, pe: 35.0 },
-    'AMZN': { price: 249.7, changesPercentage: 0.92, change: 2.3, dayLow: 247.0, dayHigh: 251.0, yearHigh: 260.0, yearLow: 180.0, marketCap: 2600000000000, priceAvg50: 240.0, priceAvg200: 220.0, volume: 30000000, avgVolume: 28000000, exchange: 'NASDAQ', open: 247.4, previousClose: 247.4, eps: 5.0, pe: 49.9 },
+    'KSUSD': { price: 1186.0, changesPercentage: 0.22, change: 2.6, dayLow: 1178.0, dayHigh: 1192.0, yearHigh: 1250.0, yearLow: 1080.0, marketCap: 0, priceAvg50: 1165.0, priceAvg200: 1140.0, volume: 120000, avgVolume: 110000, exchange: 'KRX', open: 1183.4, previousClose: 1183.4, eps: 0, pe: 0 },
   };
 
   return symbols.map(symbol => ({
@@ -361,11 +343,10 @@ export function getMockQuotes(symbols: string[]): Quote[] {
 
 export function getMockNews(): NewsItem[] {
   return [
-    { symbol: 'NVDA', publishedDate: new Date().toISOString(), title: '엔비디아, AI 칩 수요 폭발적 증가로 사상 최대 분기 매출 경신', text: '엔비디아가 4분기 예상치를 뛰어넘는 실적을 기록하며 AI 칩 시장에 강력한 수요가 있음을 입증했다.', source: 'Reuters', image: '', url: '#' },
-    { symbol: 'SPY', publishedDate: new Date().toISOString(), title: '美 Fed, 금리 동결 유지 발표 — 2026년 인하 기대 여부 논쟁', text: '연방준비위원회는 만장일치로 기준금리를 현재 수준으로 유지한다고 밝혔다.', source: 'Bloomberg', image: '', url: '#' },
+    { symbol: 'NQUSD', publishedDate: new Date().toISOString(), title: '나스닥 선물, 기술주 강세에 사상 최고치 경신', text: 'AI 반도체 수요 급증과 금리 인하 기대로 나스닥 선물이 강세를 보이고 있다.', source: 'Reuters', image: '', url: '#' },
     { symbol: 'GCUSD', publishedDate: new Date().toISOString(), title: '골드 $4,800 돌파 — 글로벌 불확실성 손실回避 수요 급증', text: '지정학적 리스크와 인플레이션 우려로 금 가격이 사상 최고치를 경신하고 있다.', source: 'CNBC', image: '', url: '#' },
-    { symbol: 'TSLA', publishedDate: new Date().toISOString(), title: '테슬라, 완전자율주행 기대감에 투자자들 급매집중', text: '테슬라의 Robotaxi 서비스 구체화 기대가 높아지는 가운데, 주가가 변동성을 보이고 있다.', source: 'Reuters', image: '', url: '#' },
-    { symbol: 'META', publishedDate: new Date().toISOString(), title: '메타, AI 광고 매출 증가로 시장 기대를 상회', text: '메타의 새로운 AI 기반 광고 플랫폼이 광고주의 만족도를 높이며 매출 성장에 기여했다.', source: 'Bloomberg', image: '', url: '#' },
+    { symbol: 'CLUSD', publishedDate: new Date().toISOString(), title: 'WTI 원유, OPEC+ 감산 연장에 단기 강세 전망', text: '산유국 감산 합의로 원유 공급 축소 기대감이 반영되고 있다.', source: 'Bloomberg', image: '', url: '#' },
+    { symbol: 'KSUSD', publishedDate: new Date().toISOString(), title: '코스피, 반도체주 강세에 상승 마감', text: 'AI 수혜주 중심의 매수세 유입으로 코스피가 상승세를 기록했다.', source: '연합뉴스', image: '', url: '#' },
   ];
 }
 
@@ -375,8 +356,7 @@ export function getMockChartData(symbol = 'GCUSD'): CandleData[] {
     'NQUSD': { basePrice: 21250, volatility: 25 },
     'GCUSD': { basePrice: 3325, volatility: 6 },
     'CLUSD': { basePrice: 62.4, volatility: 0.35 },
-    'KOSPI': { basePrice: 1186, volatility: 2.5 },
-    'HSIUSD': { basePrice: 21380, volatility: 40 },
+    'KSUSD': { basePrice: 1186, volatility: 2.5 },
   };
   const { basePrice, volatility } = config[symbol] || config['GCUSD'];
   const data: CandleData[] = [];

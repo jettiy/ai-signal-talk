@@ -13,9 +13,7 @@ function buildFinancialQuery(symbol: string, label: string): string {
     'GCUSD': `${label} 금 선물 시장 분석 뉴스`,
     'CLUSD': `${label} 원유 시장 분석 뉴스`,
     'NQUSD': `${label} 나스닥 선물 시장 분석 뉴스`,
-    'AAPL': `${label} 애플 주식 실적 분석`,
-    'NVDA': `${label} 엔비디아 AI칩 수요 분석`,
-    'TSLA': `${label} 테슬라 주식 뉴스`,
+    'KSUSD': `${label} 코스피 시장 분석 뉴스`,
   };
   return queries[symbol] || `${symbol} 주식 시장 뉴스 분석`;
 }

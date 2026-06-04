@@ -11,6 +11,7 @@ import { useAiSignalStream } from '@/hooks/useAiSignalStream';
 import { useMarketData } from '@/hooks/useMarketData';
 import { useNews } from '@/hooks/useNews';
 import { AiSignalResult, getPredictionType, UserRole } from '@/lib/types';
+import { calculateSignalFromPrice } from '@/lib/signal';
 import UserBadge from './UserBadge';
 
 // ── Timeframe 설정 ──────────────────────────────────────────────
@@ -30,8 +31,7 @@ const ASSETS = [
   { id: 'NQUSD', label: '나스닥선물', etf: 'QQQ' },
   { id: 'GCUSD', label: '골드선물', etf: 'GLD' },
   { id: 'CLUSD', label: 'WTI선물', etf: 'USO' },
-  { id: 'KOSPI', label: '코스피선물', etf: '' },
-  { id: 'HSIUSD', label: '항셍선물', etf: '' },
+  { id: 'KSUSD', label: '코스피선물', etf: 'EWY' },
 ] as const;
 
 // ── 종목별 가격 포맷 & 단위 설정 ────────────────────────────────
@@ -39,8 +39,7 @@ const ASSET_CONFIG: Record<string, { decimals: number; stopPct: number; targetPc
   NQUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.2 },
   GCUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
   CLUSD: { decimals: 2, stopPct: 0.8, targetPct: 2.0 },
-  KOSPI: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
-  HSIUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
+  KSUSD: { decimals: 2, stopPct: 0.5, targetPct: 1.0 },
 };
 
 // ETF 심볼 매핑 (AI 프롬프트 + UI 표시용)
@@ -48,81 +47,23 @@ const ETF_MAP: Record<string, string> = {
   NQUSD: 'QQQ',
   GCUSD: 'GLD',
   CLUSD: 'USO',
-  KOSPI: '',
-  HSIUSD: '',
+  KSUSD: 'EWY',
 };
 
-// 실시간 가격 기반 폴백 시그널 생성
-function getFallbackSignal(asset: string, tf: TimeframeId, livePrice?: number) {
+// 실시간 가격 기반 폴백 시그널 계산 (API 호출 없음)
+function calcFallbackSignal(asset: string, tf: TimeframeId, livePrice: number, changePct: number) {
   const cfg = ASSET_CONFIG[asset] || ASSET_CONFIG['NQUSD'];
-  const p = livePrice || 100; // 실시간 가격 없으면 안전 기본값
-  const etf = ETF_MAP[asset] || asset;
-
-  const fmt = (n: number) => n.toLocaleString('en-US', {
-    minimumFractionDigits: cfg.decimals,
-    maximumFractionDigits: cfg.decimals,
+  const etfLabel = ASSETS.find(a => a.id === asset)?.label || asset;
+  return calculateSignalFromPrice({
+    asset,
+    timeframe: tf,
+    price: livePrice,
+    changePct,
+    decimals: cfg.decimals,
+    stopPct: cfg.stopPct,
+    targetPct: cfg.targetPct,
+    label: etfLabel,
   });
-
-  const stopMul = cfg.stopPct / 100;
-  const targetMul = cfg.targetPct / 100;
-
-  const signals: Record<TimeframeId, {
-    direction: 'buy' | 'sell';
-    buyProb: number;
-    sellProb: number;
-    entry: string;
-    stopLoss: string;
-    takeProfit: string;
-    riskReward: string;
-    confidence: number;
-    rationale: string;
-    predictionType: string;
-  }> = {
-    '1min': {
-      direction: 'buy', buyProb: 62, sellProb: 38,
-      entry: fmt(p), stopLoss: fmt(p * (1 - stopMul * 0.3)), takeProfit: fmt(p * (1 + targetMul * 0.4)),
-      riskReward: '2.5', confidence: 58,
-      predictionType: '다음 봉 예측',
-      rationale: `${etf} 1분봉 RSI 과매도 반등. 단기 매수세 유입.`,
-    },
-    '5min': {
-      direction: 'sell', buyProb: 35, sellProb: 65,
-      entry: fmt(p * 1.001), stopLoss: fmt(p * (1 + stopMul * 0.5)), takeProfit: fmt(p * (1 - targetMul * 0.6)),
-      riskReward: '2.5', confidence: 65,
-      predictionType: '다음 봉 예측',
-      rationale: `${etf} 5분봉 상단밴드 저항. MACD 데드크로스.`,
-    },
-    '15min': {
-      direction: 'buy', buyProb: 71, sellProb: 29,
-      entry: fmt(p * 0.999), stopLoss: fmt(p * (1 - stopMul)), takeProfit: fmt(p * (1 + targetMul)),
-      riskReward: '2.3', confidence: 71,
-      predictionType: '현재봉 마감',
-      rationale: `${etf} 15분봉 EMA21 지지. 스토캐스틱 골든크로스.`,
-    },
-    '30min': {
-      direction: 'buy', buyProb: 58, sellProb: 42,
-      entry: fmt(p), stopLoss: fmt(p * (1 - stopMul * 1.2)), takeProfit: fmt(p * (1 + targetMul * 1.1)),
-      riskReward: '1.86', confidence: 58,
-      predictionType: '현재봉 마감',
-      rationale: `${etf} 30분봉 EMA50 지지. 볼린저 미들밴드 반등.`,
-    },
-    '1hour': {
-      direction: 'sell', buyProb: 40, sellProb: 60,
-      entry: fmt(p * 1.002), stopLoss: fmt(p * (1 + stopMul * 1.5)), takeProfit: fmt(p * (1 - targetMul * 1.5)),
-      riskReward: '2.1', confidence: 60,
-      predictionType: '현재봉 마감',
-      rationale: `${etf} 1시간봉 더블탑. RSI 70 과매수 divergence.`,
-    },
-    '1day': {
-      direction: 'buy', buyProb: 74, sellProb: 26,
-      entry: fmt(p * 0.998), stopLoss: fmt(p * (1 - stopMul * 3)), takeProfit: fmt(p * (1 + targetMul * 3)),
-      riskReward: '1.94', confidence: 74,
-      predictionType: '현재봉 마감',
-      rationale: `${etf} 일봉 EMA200 지지. 양봉 모멘텀 지속.`,
-    },
-  };
-
-  return signals[tf];
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────
@@ -217,7 +158,17 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
 
   // 표시할 시그널 데이터 결정 (AI 결과 우선, 없으면 실시간 가격 기반 폴백)
   const livePrice = currentQuote?.price;
-  const fallback = getFallbackSignal(asset, timeframe, livePrice);
+  const changePct = currentQuote?.changesPercentage ?? 0;
+  const fallback = livePrice
+    ? calcFallbackSignal(asset, timeframe, livePrice, changePct)
+    : {
+        direction: 'buy' as const,
+        buyProb: 50, sellProb: 50,
+        entry: '-', stopLoss: '-', takeProfit: '-',
+        riskReward: '1.00', confidence: 50,
+        rationale: '가격 데이터 없음',
+        predictionType: getPredictionType(timeframe),
+      };
   const isShortTerm = timeframe === '1min' || timeframe === '5min';
   const predictionType = getPredictionType(timeframe);
 
@@ -329,7 +280,16 @@ export default function SignalPanel({ userRole = 'BASIC' as UserRole }: { userRo
         <div className="flex-1 min-h-0 overflow-y-auto p-3" style={{ background: '#0A0A0F' }}>
           <div className="grid grid-cols-3 gap-2">
             {TIMEFRAMES.map((tf) => {
-              const sig = getFallbackSignal(asset, tf.id, livePrice);
+              const sig = livePrice
+                ? calcFallbackSignal(asset, tf.id, livePrice, changePct)
+                : {
+                    direction: 'buy' as const,
+                    buyProb: 50, sellProb: 50,
+                    entry: '-', stopLoss: '-', takeProfit: '-',
+                    riskReward: '1.00', confidence: 50,
+                    rationale: '가격 데이터 없음',
+                    predictionType: getPredictionType(tf.id),
+                  };
               const color = sig.direction === 'buy' ? '#00FF41' : '#FF3B3B';
               const bgColor = sig.direction === 'buy' ? 'rgba(0,255,65,0.06)' : 'rgba(255,59,59,0.06)';
               const borderColor = sig.direction === 'buy' ? 'rgba(0,255,65,0.2)' : 'rgba(255,59,59,0.2)';

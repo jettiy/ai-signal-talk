@@ -7,7 +7,7 @@ import { AiSignalResult, WebSearchResult, getPredictionType } from './types';
 
 // ETF 심볼 매핑 (AI 프롬프트에서 ETF 이름 표시용)
 const ETF_MAP: Record<string, string> = {
-  KOSPI: '',
+  KSUSD: '',
   NQUSD: 'QQQ',
   GCUSD: 'GLD',
   CLUSD: 'USO',

@@ -22,7 +22,7 @@ const AGENT_TOOLS = [
         properties: {
           symbol: {
             type: 'string',
-            description: '조회할 종목 심볼 (예: GCUSD=골드, AAPL=애플, NVDA=엔비디아, KOSPI=코스피선물)',
+            description: '조회할 종목 심볼 (예: GCUSD=골드, NQUSD=나스닥선물, KSUSD=코스피, CLUSD=원유)',
           },
         },
         required: ['symbol'],
@@ -40,7 +40,7 @@ const AGENT_TOOLS = [
           symbols: {
             type: 'array',
             items: { type: 'string' },
-            description: '조회할 종목 심볼 배열 (예: ["GCUSD", "AAPL", "NVDA"])',
+            description: '조회할 종목 심볼 배열 (예: ["GCUSD", "NQUSD", "KSUSD"])',
           },
         },
         required: ['symbols'],

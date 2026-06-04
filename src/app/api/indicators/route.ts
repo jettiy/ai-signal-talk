@@ -7,9 +7,7 @@ const TD_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 
 const SYMBOL_MAP: Record<string, string> = {
   NQUSD: 'QQQ', GCUSD: 'GLD', CLUSD: 'USO',
-  BTCUSD: 'BTC/USD', ETHUSD: 'ETH/USD',
-  AAPL: 'AAPL', NVDA: 'NVDA', TSLA: 'TSLA', META: 'META',
-  MSFT: 'MSFT', AMZN: 'AMZN', GOOGL: 'GOOGL', AMD: 'AMD',
+  KSUSD: 'EWY',
 };
 
 function getTdSymbol(symbol: string): string {

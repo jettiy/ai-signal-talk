@@ -20,7 +20,7 @@ import {
 import { useMarketData } from '@/hooks/useMarketData';
 import { useNews } from '@/hooks/useNews';
 
-type AssetId = 'KOSPI' | 'NQUSD' | 'GCUSD' | 'CLUSD' | 'HSIUSD';
+type AssetId = 'KSUSD' | 'NQUSD' | 'GCUSD' | 'CLUSD';
 type TimeframeId = '1min' | '5min' | '15min' | '30min' | '1hour' | '1day';
 type SocketStatus = 'authenticating' | 'connecting' | 'open' | 'closed';
 
@@ -67,24 +67,21 @@ const BACKEND_HTTP_URL =
 const DEFAULT_CHANNELS: Channel[] = [
   { id: 1, name: 'Global', symbol: null },
   { id: 2, name: 'NASDAQ', symbol: 'NQUSD' },
-  { id: 3, name: 'HSI', symbol: 'HSIUSD' },
-  { id: 4, name: 'GOLD', symbol: 'GCUSD' },
-  { id: 5, name: 'OIL', symbol: 'CLUSD' },
-  { id: 6, name: 'KOSPI', symbol: 'KSUSD' },
+  { id: 3, name: 'GOLD', symbol: 'GCUSD' },
+  { id: 4, name: 'OIL', symbol: 'CLUSD' },
+  { id: 5, name: 'KOSPI', symbol: 'KSUSD' },
 ];
 
 const ASSETS: Array<{ id: AssetId; label: string; short: string; fallbackPrice: number }> = [
-  { id: 'KOSPI', label: '코스피선물', short: 'KOSPI', fallbackPrice: 1186.0 },
+  { id: 'KSUSD', label: '코스피선물', short: 'KOSPI', fallbackPrice: 1186.0 },
   { id: 'NQUSD', label: '나스닥선물', short: 'NQ', fallbackPrice: 21250.0 },
   { id: 'GCUSD', label: '골드선물', short: 'GOLD', fallbackPrice: 3325.0 },
   { id: 'CLUSD', label: 'WTI선물', short: 'WTI', fallbackPrice: 62.4 },
-  { id: 'HSIUSD', label: '항셍선물', short: 'HSI', fallbackPrice: 21380.0 },
 ];
 
 const CHANNEL_TABS: Array<{ id: string; label: string; icon: string }> = [
   { id: 'global', label: '전체', icon: '🌍' },
   { id: 'NASDAQ', label: '나스닥', icon: '📈' },
-  { id: 'HSI', label: '항셍', icon: '🇭🇰' },
   { id: 'GOLD', label: '골드', icon: '🥇' },
   { id: 'OIL', label: '원유', icon: '🛢️' },
   { id: 'KOSPI', label: '코스피', icon: '🇰🇷' },
@@ -300,7 +297,6 @@ export default function CommunityPanel({ userName = '트레이더' }: { userName
     const tabToChannelName: Record<string, string> = {
       global: 'Global',
       NASDAQ: 'NASDAQ',
-      HSI: 'HSI',
       GOLD: 'GOLD',
       OIL: 'OIL',
       KOSPI: 'KOSPI',
