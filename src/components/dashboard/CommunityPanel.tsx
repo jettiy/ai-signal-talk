@@ -119,7 +119,7 @@ interface CommunityPanelProps {
 }
 
 export default function CommunityPanel({ userName: _userName }: CommunityPanelProps) {
-  const { messages, status, onlineCount, typingUser, sendMessage } =
+  const { messages, status, typingUser, sendMessage, sending } =
     useCommunityChat();
 
   const [input, setInput] = useState('');
@@ -135,9 +135,8 @@ export default function CommunityPanel({ userName: _userName }: CommunityPanelPr
   /* ---------- 전송 ---------- */
   const handleSend = () => {
     const text = input.trim();
-    if (!text) return;
-    const mentionAi = text.startsWith('@AI');
-    sendMessage(text, mentionAi);
+    if (!text || sending) return;
+    sendMessage(text);
     setInput('');
   };
 
@@ -154,10 +153,10 @@ export default function CommunityPanel({ userName: _userName }: CommunityPanelPr
       <div className="flex items-center gap-2 px-4 h-12 border-b border-[#1A1A1A] shrink-0">
         <span className="text-[#DBDEE1] font-bold text-base">💬 시그널톡</span>
         <span className="text-[#6D6F78] text-sm ml-auto">
-          {onlineCount > 0 ? (
+          {status === 'connected' ? (
             <>
               <span className="inline-block w-2 h-2 rounded-full bg-[#57F287] mr-1" />
-              {onlineCount}명 온라인
+              채팅 연결됨
             </>
           ) : (
             <span className="text-[#6D6F78]">연결 중...</span>

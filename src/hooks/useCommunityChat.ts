@@ -14,47 +14,40 @@ export interface ChatMessage {
   is_bot: boolean;
   user_role: string;
   created_at: string;
-  /** 클라이언트 전용: 이전 메시지와 같은 작성자인지 플래그 */
+  /** 클라이언트 전용 */
   isConsecutive?: boolean;
-  /** 클라이언트 전용: 새 날짜 구분선이 필요한지 */
   showDateSep?: boolean;
 }
 
-export interface PresenceEvent {
-  event: 'join' | 'leave';
-  nickname: string;
-  online_count: number;
-}
+export type ChatStatus = 'connecting' | 'connected' | 'disconnected';
 
-export type SocketStatus = 'connecting' | 'open' | 'closed';
+/* ------------------------------------------------------------------ */
+/*  Config                                                             */
+/* ------------------------------------------------------------------ */
+
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL ||
+  'https://ai-signal-talk-backend.onrender.com';
+
+const POLL_INTERVAL = 3000; // 3초마다 폴링
 
 /* ------------------------------------------------------------------ */
 /*  Hook                                                               */
 /* ------------------------------------------------------------------ */
 
-const WS_URL =
-  process.env.NEXT_PUBLIC_WS_URL ||
-  'wss://ai-signal-talk-backend.onrender.com/ws/chat';
-
-const HTTP_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  'https://ai-signal-talk-backend.onrender.com';
-
-/** 재연결 지연 (ms) */
-const RECONNECT_DELAY = 3000;
-
 export function useCommunityChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [status, setStatus] = useState<SocketStatus>('closed');
+  const [status, setStatus] = useState<ChatStatus>('disconnected');
   const [onlineCount, setOnlineCount] = useState(0);
   const [typingUser, setTypingUser] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMounted = useRef(true);
+  const lastMessageIdRef = useRef<number>(0);
 
-  /* ---------- 메시지 날짜 구분선 / 연속 여부 계산 ---------- */
+  /* ---------- 메시지 데코레이션 ---------- */
   const decorateMessages = useCallback(
     (msgs: ChatMessage[]): ChatMessage[] => {
       return msgs.map((msg, i) => {
@@ -64,6 +57,8 @@ export function useCommunityChat() {
           prev.user_id != null &&
           msg.user_id != null &&
           prev.user_id === msg.user_id &&
+          !prev.is_bot &&
+          !msg.is_bot &&
           new Date(msg.created_at).getTime() -
             new Date(prev.created_at).getTime() <
             5 * 60 * 1000;
@@ -79,167 +74,157 @@ export function useCommunityChat() {
     [],
   );
 
-  /* ---------- 이전 메시지 불러오기 ---------- */
-  const loadHistory = useCallback(async () => {
+  /* ---------- 메시지 로드 ---------- */
+  const loadMessages = useCallback(async () => {
     try {
       const token = localStorage.getItem('access_token') || '';
-      const res = await fetch(`${HTTP_URL}/api/v2/chat/messages`, {
+      const res = await fetch(`${BACKEND_URL}/api/v2/chat/messages?limit=50`, {
         headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
       });
       if (!res.ok) return;
-      const data: ChatMessage[] | { messages: ChatMessage[] } =
-        await res.json();
-      const list = Array.isArray(data) ? data : data.messages ?? [];
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : [];
+      if (list.length > 0) {
+        lastMessageIdRef.current = list[list.length - 1].id;
+      }
       setMessages(decorateMessages(list));
     } catch {
-      // 네트워크 오류 — 조용히 무시
+      // 조용히 무시
     }
   }, [decorateMessages]);
 
-  /* ---------- WebSocket 연결 ---------- */
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+  /* ---------- 새 메시지 폴링 ---------- */
+  const pollNewMessages = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('access_token') || '';
+      const res = await fetch(`${BACKEND_URL}/api/v2/chat/messages?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const list: ChatMessage[] = Array.isArray(data) ? data : [];
 
-    const token = localStorage.getItem('access_token') || '';
-    const url = `${WS_URL}?token=${encodeURIComponent(token)}`;
-
-    setStatus('connecting');
-
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      if (!isMounted.current) return;
-      setStatus('open');
-      // 연결 후 히스토리 로드
-      loadHistory();
-    };
-
-    ws.onmessage = (event) => {
-      if (!isMounted.current) return;
-
-      let data: Record<string, unknown>;
-      try {
-        data = JSON.parse(event.data as string);
-      } catch {
-        return;
-      }
-
-      const type = data.type as string;
-
-      switch (type) {
-        case 'message': {
-          const msg: ChatMessage = {
-            id: (data.id as number) ?? Date.now(),
-            user_id: (data.user_id as number | null) ?? null,
-            nickname: (data.nickname as string) ?? '알 수 없음',
-            content: (data.content as string) ?? '',
-            is_bot: !!(data.is_bot as boolean),
-            user_role: (data.user_role as string) ?? 'USER',
-            created_at: (data.created_at as string) ?? new Date().toISOString(),
-          };
-          setMessages((prev) => {
-            const next = [...prev, msg];
-            return decorateMessages(next);
-          });
-          break;
-        }
-        case 'presence': {
-          const ev = data.event as string;
-          const name = (data.nickname as string) ?? '';
-          const count = (data.online_count as number) ?? 0;
-          setOnlineCount(count);
-
-          // 시스템 메시지 형태로 표시
-          if (ev === 'join' || ev === 'leave') {
-            const emoji = ev === 'join' ? '🟢' : '🔴';
-            const sysMsg: ChatMessage = {
-              id: Date.now(),
-              user_id: null,
-              nickname: 'System',
-              content: `${emoji} ${name}님이 ${ev === 'join' ? '입장' : '퇴장'}하셨습니다.`,
-              is_bot: false,
-              user_role: 'SYSTEM',
-              created_at: new Date().toISOString(),
-            };
-            setMessages((prev) => {
-              const next = [...prev, sysMsg];
-              return decorateMessages(next);
-            });
-          }
-          break;
-        }
-        case 'typing': {
-          const nick = (data.nickname as string) ?? '';
-          setTypingUser(nick);
-          if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-          typingTimerRef.current = setTimeout(() => {
+      // 새 메시지만 필터링
+      const newMsgs = list.filter((m) => m.id > lastMessageIdRef.current);
+      if (newMsgs.length > 0) {
+        lastMessageIdRef.current = newMsgs[newMsgs.length - 1].id;
+        setMessages((prev) => {
+          // AI 타이핑 표시 중이면 AI 메시지는 타이핑 끄고 추가
+          const aiMsg = newMsgs.find((m) => m.is_bot);
+          if (aiMsg) {
             setTypingUser(null);
-          }, 4000);
-          break;
-        }
-        case 'system': {
-          const sysMsg: ChatMessage = {
-            id: Date.now(),
-            user_id: null,
-            nickname: 'System',
-            content: (data.content as string) ?? '',
-            is_bot: false,
-            user_role: 'SYSTEM',
-            created_at: new Date().toISOString(),
-          };
-          setMessages((prev) => {
-            const next = [...prev, sysMsg];
-            return decorateMessages(next);
-          });
-          break;
-        }
+          }
+          return decorateMessages([...prev, ...newMsgs]);
+        });
       }
-    };
+    } catch {
+      // 무시
+    }
+  }, [decorateMessages]);
 
-    ws.onclose = () => {
-      if (!isMounted.current) return;
-      setStatus('closed');
-      wsRef.current = null;
-      // 재연결
-      reconnectTimerRef.current = setTimeout(() => {
-        if (isMounted.current) connect();
-      }, RECONNECT_DELAY);
-    };
-
-    ws.onerror = () => {
-      ws?.close();
-    };
-  }, [loadHistory, decorateMessages]);
-
-  /* ---------- 메시지 전송 ---------- */
+  /* ---------- 메시지 전송 (HTTP POST) ---------- */
   const sendMessage = useCallback(
-    (content: string, mentionAi = false) => {
-      const ws = wsRef.current;
-      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    async (content: string) => {
+      const token = localStorage.getItem('access_token') || '';
+      const trimmed = content.trim();
+      if (!trimmed) return;
 
-      const payload = {
-        type: 'message',
-        content: mentionAi ? `@AI ${content}` : content,
+      // 낙관적 업데이트: 내 메시지 바로 추가
+      const optimisticMsg: ChatMessage = {
+        id: Date.now(),
+        user_id: null, // 내 건데 클라이언트에서는 모름
+        nickname: '나',
+        content: trimmed,
+        is_bot: false,
+        user_role: 'BASIC',
+        created_at: new Date().toISOString(),
       };
-      ws.send(JSON.stringify(payload));
+
+      setMessages((prev) => decorateMessages([...prev, optimisticMsg]));
+
+      // @AI 포함 시 타이핑 표시
+      const mentionAi = trimmed.toLowerCase().startsWith('@ai');
+
+      try {
+        if (mentionAi) {
+          // AI 호출 — /api/v2/conversations/{id}/messages 또는 전용 엔드포인트 사용
+          const query = trimmed.replace(/^@ai\s*/i, '').trim();
+          if (!query) return;
+
+          setSending(true);
+          setTypingUser('AI 어시스턴트');
+
+          // 백엔드에 @AI 메시지 전송 엔드포인트 호출
+          const res = await fetch(`${BACKEND_URL}/api/v2/chat/ai`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ content: trimmed }),
+            cache: 'no-store',
+          });
+
+          setTypingUser(null);
+
+          if (res.ok) {
+            // 폴링으로 AI 응답을 가져올 것
+            // 낙관적 메시지 제거 후 전체 리로드
+            setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+            await loadMessages();
+          }
+        } else {
+          // 일반 메시지 — POST로 전송
+          const res = await fetch(`${BACKEND_URL}/api/v2/chat/send`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ content: trimmed }),
+            cache: 'no-store',
+          });
+
+          if (res.ok) {
+            // 낙관적 메시지 제거 후 전체 리로드
+            setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+            await loadMessages();
+          }
+        }
+      } catch {
+        // 전송 실패 시에도 낙관적 메시지 유지
+      } finally {
+        setSending(false);
+      }
     },
-    [],
+    [loadMessages, decorateMessages],
   );
 
   /* ---------- 라이프사이클 ---------- */
   useEffect(() => {
     isMounted.current = true;
-    connect();
+    setStatus('connecting');
+    loadMessages().then(() => {
+      if (isMounted.current) {
+        setStatus('connected');
+      }
+    });
+
+    // 폴링 시작
+    pollTimerRef.current = setInterval(() => {
+      if (isMounted.current) {
+        pollNewMessages();
+      }
+    }, POLL_INTERVAL);
 
     return () => {
       isMounted.current = false;
-      wsRef.current?.close();
-      wsRef.current = null;
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     };
-  }, [connect]);
+  }, [loadMessages, pollNewMessages]);
 
   return {
     messages,
@@ -247,6 +232,6 @@ export function useCommunityChat() {
     onlineCount,
     typingUser,
     sendMessage,
-    loadHistory,
+    sending,
   };
 }
