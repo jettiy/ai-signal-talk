@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFearGreedIndex } from '@/lib/fmp';
 
+export const revalidate = 300;
+
 export async function GET(req: NextRequest) {
   const data = await getFearGreedIndex();
 

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BACKEND_URL } from '@/lib/backend';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   const nickname = req.nextUrl.searchParams.get('nickname') ?? '';
   try {

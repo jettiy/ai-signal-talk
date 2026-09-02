@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchBloombergNews, fetchSeekingAlphaNews, fetchYahooNews } from '@/lib/rss-news';
+import { translateNewsToKorean } from '@/lib/zai-web-search';
 import type { NewsItem } from '@/lib/types';
+
+export const revalidate = 300;
 
 // ═══════════════════════════════════════════════════════════
 //  GDELT 뉴스 가져오기
@@ -37,23 +40,16 @@ async function getGdeltNews(): Promise<NewsItem[]> {
 const BREAKING_KEYWORDS = [
   'fed', 'fomc', 'rate cut', 'rate hike', 'interest rate', 'federal reserve',
   'ecb', 'boj', 'bank of japan', 'powell', 'yellen',
-  '기준금리', '금리', '연준', '인하', '동결',
   'gdp', 'cpi', 'ppi', 'inflation', 'deflation', 'recession',
   'unemployment', 'jobs', 'nonfarm', 'employment', 'retail sales',
-  '경제성장률', '물가지수', '고용', '실업률',
   'war', 'conflict', 'sanction', 'tariff', 'trade war', 'nuclear',
   'israel', 'iran', 'russia', 'ukraine', 'china', 'north korea',
-  '지정학', '전쟁', '제재', '관세', '무역',
   'crash', 'surge', 'rally', 'plunge', 'record high', 'record low',
   'halt', 'circuit breaker', 'flash crash',
-  '급락', '급등', '폭락', '돌파', '사상최고', '최저',
   'opec', 'oil price', 'gold price', 'gold hit', 'crude',
-  '산유', '원유', '골드', '금값',
   'nvidia', 'apple', 'tesla', 'microsoft', 'google', 'meta',
   'ai chip', 'semiconductor', 'tech layoff',
-  '엔비디아', '테슬라', '반도체',
   'bitcoin', 'ethereum', 'crypto', 'sec', 'etf approval',
-  '비트코인', '암호화폐',
 ];
 
 const CRITICAL_KW = ['fed', 'fomc', 'rate cut', 'rate hike', 'circuit breaker', 'crash'];
@@ -82,12 +78,26 @@ function calcImpact(title: string, text: string): number {
   return score;
 }
 
+// ── 카테고리 키워드 필터 (클라이언트 inferCategory와 동일 로직) ──
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  commodity: ['gold', 'oil', 'wti', 'crude', 'commodity', 'opec', 'gcusd', 'clusd'],
+  tech: ['aapl', 'nvda', 'tsla', 'meta', 'msft', 'amzn', 'googl', 'ai chip', 'chip', 'semiconductor', 'nvidia', 'apple', 'tesla', 'microsoft', 'google'],
+  crypto: ['btcusd', 'ethusd', 'bitcoin', 'ethereum', 'crypto'],
+};
+
+function matchesCategory(item: NewsItem, category: string): boolean {
+  if (category === 'all' || !category) return true;
+  const keywords = CATEGORY_KEYWORDS[category];
+  if (!keywords) return true; // 알 수 없는 카테고리는 모두 통과
+  const text = `${item.symbol} ${item.title} ${item.text}`.toLowerCase();
+  return keywords.some((kw) => text.includes(kw));
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const symbol = searchParams.get('symbol') || '';
-  const category = searchParams.get('category') || ''; // 인터페이스 유지
+  const category = searchParams.get('category') || '';
   const mode = searchParams.get('mode') || 'column';
-  void category;
 
   // ── 1. RSS + GDELT 병렬 수집 ────────────────────────
   const results = await Promise.allSettled([
@@ -127,13 +137,24 @@ export async function GET(req: NextRequest) {
     filteredNews = scored.length > 0 ? scored.slice(0, 20) : uniqueNews.slice(0, 15);
   }
 
-  // ── 4. 원문 그대로 반환 (번역은 /api/news/translate 에서 항목별 요청) ──
+  // ── 4. 카테고리 필터 (서버 사이드) ─────────────────
+  if (category) {
+    filteredNews = filteredNews.filter((item) => matchesCategory(item, category));
+  }
+
+  // 유효한 URL만
   const enriched = filteredNews.filter((item) => item.url && item.url.startsWith('http'));
 
-  // ── 5. 캐시 ──────────────────────────────────────────
+  // 최대 20개
+  const finalNews = enriched.slice(0, 20);
+
+  // ── 5. GLM 한국어 배치 번역 ────────────────────────
+  const translatedNews = await translateNewsToKorean(finalNews);
+
+  // ── 6. 캐시 ──────────────────────────────────────────
   const cacheMaxAge = mode === 'breaking' ? 300 : 3600;
 
-  return NextResponse.json(enriched.slice(0, 20), {
+  return NextResponse.json(translatedNews, {
     headers: {
       'Cache-Control': `public, s-maxage=${cacheMaxAge}, stale-while-revalidate=${cacheMaxAge * 2}`,
     },

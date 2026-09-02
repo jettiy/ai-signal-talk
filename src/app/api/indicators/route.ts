@@ -1,6 +1,8 @@
 // /api/indicators — Twelve Data 기술적 지표
 import { NextRequest, NextResponse } from 'next/server';
 
+export const revalidate = 60;
+
 const TD_API_KEY = process.env.TWELVE_DATA_API_KEY || '';
 const TD_BASE = 'https://api.twelvedata.com';
 const TD_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';

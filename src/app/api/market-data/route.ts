@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getQuotes } from '@/lib/fmp';
 
+export const revalidate = 30;
+
 export async function GET() {
   // 선물 5종 + 주요 종목 (커뮤니티 패널 `activeAsset`과 심볼 키 일치)
   const symbols = [

@@ -1,0 +1,29 @@
+{
+  "project": { "id": "ai-signal-talk", "name": "AI Signal Talk" },
+  "categories": ["백엔드/API", "채팅/실시간", "프론트", "인프라/DB"],
+  "starter_todos": [
+    {
+      "title": "채팅 전송 방식 확정 (WebSocket vs polling)",
+      "priority": "high",
+      "category": "채팅/실시간",
+      "note": "ws-relay 도입 후 전송 방식 리팩터 마무리"
+    },
+    {
+      "title": "시그널 룰 엔진 POST /rules 구현",
+      "priority": "high",
+      "category": "백엔드/API",
+      "note": "룰 정의/검증 엔드포인트 + 권한 검증"
+    },
+    {
+      "title": "어드민 권한 강화",
+      "priority": "medium",
+      "category": "백엔드/API",
+      "note": "관리자 엔드포인트 인가 정책"
+    },
+    {
+      "title": "PostgreSQL 스키마/마이그레이션 정비",
+      "priority": "medium",
+      "category": "인프라/DB"
+    }
+  ]
+}

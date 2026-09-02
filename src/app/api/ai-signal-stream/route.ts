@@ -3,6 +3,8 @@ import { callZaiGLM51Stream } from '@/lib/ai';
 import { searchFinancialNews } from '@/lib/zai-web-search';
 import { FUTURES_SYMBOLS } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 // 메모리 기반 일일 카운터 (ai-signal과 공유하지 않아도 됨 — 스트리밍 전용)
 const dailyCounts = new Map<string, { date: string; count: number }>();
 const DAILY_LIMIT = 10;

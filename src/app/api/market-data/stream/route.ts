@@ -3,6 +3,8 @@
 // FMP API 호출 최소화: 서버에서 캐시 후 브로드캐스트
 
 import { getQuotes } from '@/lib/fmp';
+
+export const dynamic = 'force-dynamic';
 import type { Quote } from '@/lib/types';
 
 const SYMBOLS = [

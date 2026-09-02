@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { translateNewsToKorean } from '@/lib/zai-web-search';
 import type { NewsItem } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 /** 단일 뉴스 항목을 한국어로 번역 (사용자가 '번역' 클릭 시) */
 export async function POST(req: NextRequest) {
   try {

@@ -7,7 +7,7 @@ function extractTag(item: string, tag: string): string {
   const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
   const match = item.match(regex);
   if (!match) return '';
-  return match[1].replace(/<!\\[CDATA\\[|\\]\\]>/g, '').trim();
+  return match[1].replace(/<!\[CDATA\[|\]\]>/g, '').trim();
 }
 
 function stripHtml(raw: string): string {

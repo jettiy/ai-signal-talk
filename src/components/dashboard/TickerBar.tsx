@@ -7,7 +7,7 @@ interface TickerQuote {
   symbol: string;
   price: number;
   change: number;
-  changesPercentage: number;
+  changePct: number;
 }
 
 interface TickerItem {
@@ -24,11 +24,12 @@ interface TickerItem {
 const SYMBOL_LABEL_MAP: Record<string, string> = {
   NQUSD: '나스닥선물',
   GCUSD: '골드선물',
-  CLUSD: 'WTI선물',
+  CLUSD: 'WTI원유',
   KSUSD: '코스피선물',
 };
 
 function formatPrice(price: number): string {
+  if (price === 0) return '---';
   return price.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -36,93 +37,52 @@ function formatPrice(price: number): string {
 }
 
 function formatChange(pct: number): string {
+  if (pct === 0 && arguments.length === 0) return '---';
   const sign = pct >= 0 ? '+' : '';
   return `${sign}${pct.toFixed(2)}%`;
 }
 
-// ── SSE 실시간 시세 Hook ──
+// ── 실시간 시세 폴링 Hook (/api/ticker-quotes → 백엔드 /api/v2/quotes) ──
 function useRealtimeQuotes() {
   const [quotes, setQuotes] = useState<TickerQuote[]>([]);
-  const [connected, setConnected] = useState(false);
   const prevQuotesRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
-    const controller = new AbortController();
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval>;
 
-    async function connect() {
+    async function poll() {
       try {
-        const res = await fetch('/api/market-data/stream', {
-          headers: { 'Accept': 'text/event-stream' },
-          signal: controller.signal,
+        const res = await fetch('/api/ticker-quotes', {
+          cache: 'no-store',
         });
-
-        if (!res.ok || !res.body) {
-          // SSE 미지원 시 폴백: 일반 JSON 폴링
-          fallbackPolling(controller.signal);
-          return;
-        }
-
-        setConnected(true);
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          let currentData = '';
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              currentData = line.slice(6);
-            } else if (line === '' && currentData) {
-              try {
-                const data = JSON.parse(currentData);
-                if (Array.isArray(data)) {
-                  setQuotes(data);
-                }
-              } catch { /* 파싱 에러 무시 */ }
-              currentData = '';
-            }
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setQuotes(data);
           }
         }
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          // SSE 실패 시 폴백
-          fallbackPolling(controller.signal);
-        }
+      } catch {
+        // 무시 — 다음 폴링에서 재시도
       }
     }
 
-    function fallbackPolling(signal: AbortSignal) {
-      const poll = setInterval(async () => {
-        try {
-          const res = await fetch('/api/market-data', { signal });
-          if (res.ok) {
-            const data = await res.json();
-            setQuotes(data);
-            setConnected(true);
-          }
-        } catch { /* 무시 */ }
-      }, 10000);
+    // 즉시 첫 요청
+    poll();
+    // 10초마다 폴링
+    timer = setInterval(poll, 10000);
 
-      signal.addEventListener('abort', () => clearInterval(poll));
-    }
-
-    connect();
-
-    return () => controller.abort();
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
-  return { quotes, connected };
+  return quotes;
 }
 
 export default function TickerBar() {
-  const { quotes } = useRealtimeQuotes();
+  const quotes = useRealtimeQuotes();
   const [items, setItems] = useState<TickerItem[]>([]);
   const flashTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
@@ -146,14 +106,16 @@ export default function TickerBar() {
           }, 600));
         }
 
+        const hasChangePct = q.changePct !== undefined && q.changePct !== null && q.changePct !== 0;
+
         return {
           label: SYMBOL_LABEL_MAP[q.symbol] ?? q.symbol,
           symbol: q.symbol,
           price: q.price,
           prevPrice,
           formattedPrice: formatPrice(q.price),
-          change: formatChange(q.changesPercentage),
-          positive: q.changesPercentage >= 0,
+          change: hasChangePct ? formatChange(q.changePct) : '---',
+          positive: q.changePct >= 0,
           flash,
         };
       });
@@ -168,11 +130,12 @@ export default function TickerBar() {
     }
   }, [quotes, updateItems]);
 
-  // 빈 상태 폴백
+  // 빈 상태 폴백 (백엔드 연결 전)
   const displayItems = items.length > 0 ? items : [
     { label: '나스닥선물', symbol: 'NQ', price: 0, prevPrice: 0, formattedPrice: '---', change: '---', positive: true, flash: null },
     { label: '골드선물', symbol: 'GC', price: 0, prevPrice: 0, formattedPrice: '---', change: '---', positive: true, flash: null },
-    { label: 'WTI선물', symbol: 'CL', price: 0, prevPrice: 0, formattedPrice: '---', change: '---', positive: true, flash: null },
+    { label: 'WTI원유', symbol: 'CL', price: 0, prevPrice: 0, formattedPrice: '---', change: '---', positive: true, flash: null },
+    { label: '코스피선물', symbol: 'KS', price: 0, prevPrice: 0, formattedPrice: '---', change: '---', positive: true, flash: null },
   ];
 
   return (
@@ -208,9 +171,11 @@ export default function TickerBar() {
             </span>
             <span
               className="flex items-center gap-0.5 text-[10px] font-bold font-mono"
-              style={{ color: item.positive ? '#00FF41' : '#FF3B3B' }}
+              style={{ color: item.change === '---' ? '#A0A0A0' : item.positive ? '#00FF41' : '#FF3B3B' }}
             >
-              {item.positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+              {item.change !== '---' && (
+                item.positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />
+              )}
               {item.change}
             </span>
             {i < displayItems.length - 1 && (
@@ -237,9 +202,11 @@ export default function TickerBar() {
             </span>
             <span
               className="flex items-center gap-0.5 text-[10px] font-bold font-mono"
-              style={{ color: item.positive ? '#00FF41' : '#FF3B3B' }}
+              style={{ color: item.change === '---' ? '#A0A0A0' : item.positive ? '#00FF41' : '#FF3B3B' }}
             >
-              {item.positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+              {item.change !== '---' && (
+                item.positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />
+              )}
               {item.change}
             </span>
             {i < displayItems.length - 1 && (

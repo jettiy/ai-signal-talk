@@ -12,71 +12,12 @@ import ProPanel from '@/components/dashboard/ProPanel';
 import AdminPanel from '@/components/dashboard/AdminPanel';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import type { UserRole } from '@/lib/types';
-
-interface UserInfo {
-  id?: string | number;
-  email?: string;
-  nickname?: string;
-  level?: string;
-  role?: string;
-  is_pro?: boolean;
-}
-
-function getRole(user?: UserInfo | null): UserRole {
-  if (!user) return 'BASIC';
-  if (user.role === 'ADMIN' || user.level === 'LEVEL_99') return 'ADMIN';
-  if (user.role === 'PRO' || user.is_pro || user.level === 'LEVEL_50') return 'PRO';
-  return 'BASIC';
-}
-
-function clearSessionAndRedirect() {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('user');
-  window.location.href = '/';
-}
+import { useAuth } from '@/hooks/useAuth';
 
 export default function DashboardPage() {
+  const { user, userRole, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<NavId>('community');
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('BASIC');
   const [now, setNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const restoreSession = async () => {
-      try {
-        const raw = localStorage.getItem('user');
-        const token = localStorage.getItem('access_token');
-
-        if (!raw || !token) {
-          clearSessionAndRedirect();
-          return;
-        }
-
-        const cachedUser = JSON.parse(raw) as UserInfo;
-        setUser(cachedUser);
-        setUserRole(getRole(cachedUser));
-
-        const res = await fetch('/api/auth/me', {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: 'no-store',
-        });
-
-        if (!res.ok) {
-          clearSessionAndRedirect();
-          return;
-        }
-
-        const verifiedUser = (await res.json()) as UserInfo;
-        localStorage.setItem('user', JSON.stringify(verifiedUser));
-        setUser(verifiedUser);
-        setUserRole(getRole(verifiedUser));
-      } catch {
-        clearSessionAndRedirect();
-      }
-    };
-
-    void restoreSession();
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -93,7 +34,9 @@ export default function DashboardPage() {
   const userName = user?.nickname || user?.email?.split('@')[0] || '트레이더';
 
   const handleLogout = () => {
-    clearSessionAndRedirect();
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    window.location.href = '/';
   };
 
   if (!user) {

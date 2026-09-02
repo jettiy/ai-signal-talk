@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BACKEND_URL } from '@/lib/backend';
 
+export const dynamic = 'force-dynamic';
+
 const copy = {
   missingToken: '인증 토큰이 필요합니다.',
   serverFailed: '인증 서버 연결에 실패했습니다.',

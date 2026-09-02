@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BACKEND_URL } from '@/lib/backend';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get('email') ?? '';
   try {

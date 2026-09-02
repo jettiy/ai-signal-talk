@@ -3,6 +3,8 @@ import { generateSignal } from '@/lib/ai';
 import { searchFinancialNews } from '@/lib/zai-web-search';
 import { FUTURES_SYMBOLS } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
+
 // 메모리 기반 일일 카운터
 const dailyCounts = new Map<string, { date: string; count: number }>();
 const DAILY_LIMIT = 10;
